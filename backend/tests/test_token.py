@@ -69,4 +69,13 @@ def test_google_search_is_opt_in():
 
 
 def test_destructive_tools_are_the_ones_that_confirm():
-    assert {n for n, t in TOOLS.items() if t.confirm} == {"shutdown_computer", "delegate_to_claude"}
+    assert {n for n, t in TOOLS.items() if t.confirm} == {
+        "shutdown_computer", "sleep_computer", "close_program", "set_radio",
+        "send_email", "reply_email", "delegate_to_claude",
+    }
+
+
+def test_prompt_treats_mail_as_data():
+    from app.gemini import SYSTEM_INSTRUCTION
+
+    assert "untrusted_content" in SYSTEM_INSTRUCTION and "asla uygulama" in SYSTEM_INSTRUCTION

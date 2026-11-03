@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from ..config import Settings
-from . import claude, system, web
+from . import claude, gmail, pc, system, web
 
 Result = dict[str, Any]
 
@@ -25,8 +25,9 @@ class Tool:
     run: Callable[[dict, Context], Awaitable[Result]] | None
     properties: dict = field(default_factory=dict)
     required: tuple[str, ...] = ()
-    # Destructive tools only run after the user confirms by voice.
-    confirm: Callable[[dict], str] | None = None
+    # Destructive tools only run after the user confirms by voice. Returns the
+    # question to ask, or None when these particular args are harmless.
+    confirm: Callable[[dict], str | None] | None = None
 
     def declaration(self) -> dict:
         decl: dict[str, Any] = {"name": self.name, "description": self.description}
@@ -37,6 +38,22 @@ class Tool:
 
 def _str(description: str, enum: list[str] | None = None) -> dict:
     return {"type": "STRING", "description": description, **({"enum": enum} if enum else {})}
+
+
+def _int(description: str) -> dict:
+    return {"type": "INTEGER", "description": description}
+
+
+def _bool(description: str) -> dict:
+    return {"type": "BOOLEAN", "description": description}
+
+
+def _with_settings(fn):
+    return lambda a, c: fn(a, c.settings)
+
+
+def _short(text: str, limit: int = 300) -> str:
+    return text if len(text) <= limit else text[:limit] + "…"
 
 
 TOOLS: dict[str, Tool] = {
@@ -101,6 +118,137 @@ TOOLS: dict[str, Tool] = {
             "Claude'a verilen görevin durumunu ve sonucunu okur. job_id verilmezse son görev.",
             lambda a, c: c.jobs.status(a.get("job_id") or None),
             {"job_id": _str("İsteğe bağlı görev numarası.")},
+        ),
+        # ---------- PC settings ----------
+        Tool(
+            "get_pc_status",
+            "Ses seviyesi ve çıkış cihazı, parlaklık, tema, bildirimler, Wi-Fi/Bluetooth, ağ, güç planı, "
+            "işlemci/bellek ve pil durumunu tek seferde okur.",
+            _with_settings(pc.get_pc_status),
+        ),
+        Tool(
+            "set_volume",
+            "Ses seviyesini ayarlar, artırır/azaltır ya da sesi kapatır/açar.",
+            _with_settings(pc.set_volume),
+            {
+                "level": _int("0-100 arası hedef seviye."),
+                "change": _str("10 puan artır ya da azalt.", ["up", "down"]),
+                "mute": _bool("true: sesi kapat, false: sesi aç."),
+            },
+        ),
+        Tool(
+            "set_audio_output",
+            "Sesin çıktığı cihazı değiştirir (ör. kulaklık, hoparlör, monitör).",
+            _with_settings(pc.set_audio_output),
+            {"device": _str("Cihaz adı ya da bir parçası, ör. 'kulaklık', 'VG259'.")},
+            ("device",),
+        ),
+        Tool(
+            "set_brightness",
+            "Ekran parlaklığını ayarlar ya da 10 puan artırır/azaltır (tüm monitörler).",
+            _with_settings(pc.set_brightness),
+            {"level": _int("0-100 arası hedef seviye."), "change": _str("Artır ya da azalt.", ["up", "down"])},
+        ),
+        Tool(
+            "set_theme",
+            "Windows'u koyu ya da açık temaya geçirir.",
+            _with_settings(pc.set_theme),
+            {"mode": _str("Tema.", ["dark", "light"])},
+            ("mode",),
+        ),
+        Tool(
+            "set_do_not_disturb",
+            "Rahatsız etme: bildirim balonlarını ve seslerini kapatır ya da yeniden açar.",
+            _with_settings(pc.set_do_not_disturb),
+            {"on": _bool("true: rahatsız etme açık (bildirimler sessiz), false: kapalı.")},
+            ("on",),
+        ),
+        Tool(
+            "open_settings",
+            "Windows Ayarlar'da bir sayfayı açar. Gece ışığı gibi doğrudan değiştirilemeyen ayarlar için kullan.",
+            _with_settings(pc.open_settings),
+            {"page": _str("Sayfa.", list(pc.SETTINGS_PAGES))},
+            ("page",),
+        ),
+        Tool(
+            "set_radio",
+            "Wi-Fi ya da Bluetooth'u açar veya kapatır. Wi-Fi'yi kapatmak sesli onay ister.",
+            _with_settings(pc.set_radio),
+            {"radio": _str("Hangisi.", ["wifi", "bluetooth"]), "on": _bool("true: aç, false: kapat.")},
+            ("radio", "on"),
+            confirm=lambda a: (
+                "Wi-Fi kapatılsın mı? Telefondan bağlıysan bağlantı kopabilir."
+                if a.get("radio") == "wifi" and not a.get("on") else None
+            ),
+        ),
+        Tool(
+            "set_power_plan",
+            "Güç planını değiştirir (Dengeli, Yüksek performans, Güç tasarrufu...).",
+            _with_settings(pc.set_power_plan),
+            {"plan": _str("Plan adı.")},
+            ("plan",),
+        ),
+        Tool(
+            "sleep_computer",
+            "Bilgisayarı uyku moduna alır. Sesli onay gerekir.",
+            _with_settings(pc.sleep_computer),
+            confirm=lambda a: "Bilgisayar uyku moduna alınsın mı?",
+        ),
+        Tool(
+            "list_programs",
+            "Açık pencereli programları listeler.",
+            _with_settings(pc.list_programs),
+        ),
+        Tool(
+            "close_program",
+            "Açık bir programı kapatır (kaydetmeyi sorabilmesi için normal kapatma isteğiyle). Sesli onay gerekir.",
+            _with_settings(pc.close_program),
+            {"name": _str("Program ya da pencere adı.")},
+            ("name",),
+            confirm=lambda a: f"{a.get('name', '')} kapatılsın mı? Kaydedilmemiş işler kaybolabilir.",
+        ),
+        # ---------- Gmail ----------
+        Tool(
+            "list_emails",
+            "Gmail'de e-postaları listeler. Varsayılan: gelen kutusundaki okunmamışlar.",
+            _with_settings(gmail.list_emails),
+            {
+                "query": _str("Gmail arama ifadesi, ör. 'is:unread in:inbox', 'from:ahmet newer_than:2d'."),
+                "max_results": _int("En fazla kaç e-posta (1-10)."),
+            },
+        ),
+        Tool(
+            "read_email",
+            "Bir e-postanın tamamını okur.",
+            _with_settings(gmail.read_email),
+            {"id": _str("list_emails'ten gelen e-posta id'si.")},
+            ("id",),
+        ),
+        Tool(
+            "find_email_address",
+            "Bir kişinin e-posta adresini önceki yazışmalardan bulur.",
+            _with_settings(gmail.find_email_address),
+            {"name": _str("Kişinin adı.")},
+            ("name",),
+        ),
+        Tool(
+            "send_email",
+            "Yeni bir e-posta gönderir. Sesli onay gerekir.",
+            _with_settings(gmail.send_email),
+            {"to": _str("Alıcının e-posta adresi."), "subject": _str("Konu."), "body": _str("Metin.")},
+            ("to", "subject", "body"),
+            confirm=lambda a: (
+                f"{a.get('to', '')} adresine '{a.get('subject', '')}' konulu şu e-posta gönderilsin mi: "
+                f"{_short(a.get('body', ''))}"
+            ),
+        ),
+        Tool(
+            "reply_email",
+            "Bir e-postaya, gönderene yanıt verir. Sesli onay gerekir.",
+            _with_settings(gmail.reply_email),
+            {"id": _str("Yanıtlanacak e-postanın id'si."), "body": _str("Yanıt metni.")},
+            ("id", "body"),
+            confirm=lambda a: f"Bu e-postaya şu yanıt gönderilsin mi: {_short(a.get('body', ''))}",
         ),
         Tool(
             "confirm_action",

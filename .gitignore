@@ -21,3 +21,6 @@ programs/*
 Thumbs.db
 .vscode/
 .idea/
+
+# Gmail OAuth client (the token lives in backend/data/)
+backend/gmail-client.json

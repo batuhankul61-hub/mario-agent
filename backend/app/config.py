@@ -52,7 +52,10 @@ class Settings(BaseSettings):
 
     data_dir: Path = BACKEND_DIR / "data"
 
-    # A pending shutdown/Claude task must be confirmed by voice within this time.
+    # OAuth client of type "Desktop app" from Google Cloud Console; see README.
+    gmail_client_file: Path = BACKEND_DIR / "gmail-client.json"
+
+    # A pending destructive action must be confirmed by voice within this time.
     confirm_ttl_seconds: int = 90
 
     # When true, destructive tools report what they would do instead of doing
@@ -62,6 +65,10 @@ class Settings(BaseSettings):
     @property
     def audit_log(self) -> Path:
         return self.data_dir / "audit.jsonl"
+
+    @property
+    def gmail_token_file(self) -> Path:
+        return self.data_dir / "gmail-token.json"
 
 
 @lru_cache

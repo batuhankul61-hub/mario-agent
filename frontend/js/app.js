@@ -12,6 +12,11 @@ const TOOL_LABEL = {
   shutdown_computer: "Bilgisayarı kapat", cancel_shutdown: "Kapatmayı iptal et", get_weather: "Hava durumu",
   get_time: "Saat", delegate_to_claude: "Claude'a görev", check_claude_task: "Claude görev durumu",
   confirm_action: "Onay", cancel_action: "İptal", claude: "Claude görevi",
+  get_pc_status: "PC durumu", set_volume: "Ses", set_audio_output: "Ses çıkışı", set_brightness: "Parlaklık",
+  set_theme: "Tema", set_do_not_disturb: "Rahatsız etme", open_settings: "Ayarlar", set_radio: "Wi-Fi / Bluetooth",
+  set_power_plan: "Güç planı", sleep_computer: "Uyku", list_programs: "Açık programlar", close_program: "Program kapat",
+  list_emails: "E-postalar", read_email: "E-posta oku", find_email_address: "Adres bul", send_email: "E-posta gönder",
+  reply_email: "E-postayı yanıtla",
 };
 const prefs = {
   get: (k, d) => { try { return localStorage.getItem(`mario.${k}`) ?? d; } catch { return d; } },
