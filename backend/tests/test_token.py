@@ -69,9 +69,9 @@ def test_google_search_is_opt_in():
 
 
 def test_destructive_tools_are_the_ones_that_confirm():
-    assert {n for n, t in TOOLS.items() if t.confirm} == {
-        "shutdown_computer", "sleep_computer", "close_program", "set_radio",
-        "send_email", "reply_email", "delegate_to_claude",
+    assert {n for n, t in TOOLS.items() if t.confirm or t.confirm_ctx} == {
+        "shutdown_computer", "sleep_computer", "close_program", "set_radio", "set_microphone",
+        "send_email", "reply_email", "delegate_to_claude", "learn_skill", "run_skill", "forget_skill",
     }
 
 

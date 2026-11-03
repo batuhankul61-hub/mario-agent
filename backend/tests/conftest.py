@@ -34,12 +34,27 @@ def settings(tmp_path):
         data_dir=tmp_path / "data",
         claude_workdir=tmp_path / "claude",
         claude_path="claude-not-installed",
+        skills_dir=tmp_path / "skills",
     )
+
+
+@pytest.fixture(autouse=True)
+def project_untouched():
+    """Every test must work in tmp_path: fail loudly if one writes into the real project."""
+    from app.config import ROOT_DIR
+
+    watched = [ROOT_DIR / "skills", ROOT_DIR / "backend" / "app"]
+    before = {p: p.stat().st_mtime_ns for d in watched if d.exists() for p in d.rglob("*")}
+    yield
+    after = {p: p.stat().st_mtime_ns for d in watched if d.exists() for p in d.rglob("*")}
+    changed = [str(p) for p in after if before.get(p) != after[p] and "__pycache__" not in p.parts]
+    assert not changed, f"test wrote into the project: {changed}"
 
 
 @pytest.fixture
 def ctx(settings):
-    jobs = ClaudeJobs(settings.claude_path, settings.claude_workdir, 1, settings.audit_log)
+    jobs = ClaudeJobs(settings.claude_path, settings.claude_workdir, 1, settings.audit_log,
+                      skills_dir=settings.skills_dir)
     return Context(settings=settings, jobs=jobs)
 
 

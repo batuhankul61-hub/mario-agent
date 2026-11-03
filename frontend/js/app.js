@@ -16,7 +16,8 @@ const TOOL_LABEL = {
   set_theme: "Tema", set_do_not_disturb: "Rahatsız etme", open_settings: "Ayarlar", set_radio: "Wi-Fi / Bluetooth",
   set_power_plan: "Güç planı", sleep_computer: "Uyku", list_programs: "Açık programlar", close_program: "Program kapat",
   list_emails: "E-postalar", read_email: "E-posta oku", find_email_address: "Adres bul", send_email: "E-posta gönder",
-  reply_email: "E-postayı yanıtla",
+  reply_email: "E-postayı yanıtla", learn_skill: "Öğren", run_skill: "Öğrenilmiş yetenek", list_skills: "Yetenekler",
+  forget_skill: "Yeteneği unut", learned: "Yeni yetenek",
 };
 const prefs = {
   get: (k, d) => { try { return localStorage.getItem(`mario.${k}`) ?? d; } catch { return d; } },

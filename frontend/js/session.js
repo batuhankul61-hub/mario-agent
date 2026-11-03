@@ -161,11 +161,8 @@ export class Agent extends EventTarget {
         const job = await jobStatus(jobId);
         if (job.state !== "running") {
           this.jobTimers.delete(jobId);
-          this.transcript.addEvent({ kind: "job", name: "claude", status: job.state, result: job });
-          this.live?.sendText(
-            `(Sistem notu: Claude'a verdiğin görev ${job.state === "done" ? "bitti" : "başarısız oldu"}. ` +
-              `Görev: ${job.task}. Sonuç: ${job.result} Bunu kullanıcıya kısaca söyle; araç çağırma.)`,
-          );
+          this.transcript.addEvent({ kind: "job", name: job.kind === "skill" ? "learned" : "claude", status: job.state, result: job });
+          this.live?.sendText(jobNote(job));
           return;
         }
       } catch {}
@@ -187,3 +184,29 @@ export class Agent extends EventTarget {
 }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/** What Mario is told when a Claude job ends. A learned skill comes with
+ * everything needed to call it right away, because the tool list of this
+ * session was locked before the skill existed. */
+function jobNote(job) {
+  if (job.kind !== "skill") {
+    return (
+      `(Sistem notu: Claude'a verdiğin görev ${job.state === "done" ? "bitti" : "başarısız oldu"}. ` +
+      `Görev: ${job.task}. Sonuç: ${job.result} Bunu kullanıcıya kısaca söyle; araç çağırma.)`
+    );
+  }
+  if (job.state !== "done" || !job.skill) {
+    return (
+      `(Sistem notu: Claude şu isteği sana öğretemedi: ${job.task}. Sonuç: ${job.result} ` +
+      `Bunu kullanıcıya kısaca söyle; araç çağırma.)`
+    );
+  }
+  const s = job.skill;
+  const params = Object.entries(s.parameters).map(([k, v]) => `${k} (${v})`).join(", ") || "yok";
+  return (
+    `(Sistem notu: Claude sana yeni bir yetenek öğretti: ${s.name} — ${s.description} Parametreler: ${params}. ` +
+    `${job.result} Kullanıcıya öğrendiğini tek cümleyle söyle, sonra ilk isteğini ("${job.task}") hemen ` +
+    `run_skill(name="${s.name}", args_json=...) ile yap.` +
+    (s.confirm ? " Yetenek onay soracak; soruyu sor ve cevabı bekle.)" : ")")
+  );
+}

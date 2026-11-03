@@ -3,7 +3,7 @@ from functools import lru_cache
 
 from fastapi import Depends, Header, HTTPException, Request
 
-from .config import Settings, get_settings
+from .config import ROOT_DIR, Settings, get_settings
 from .confirm import PendingActions
 from .gemini import GeminiService
 from .tools import Context
@@ -33,7 +33,8 @@ def get_pending() -> PendingActions:
 @lru_cache
 def get_context() -> Context:
     s = get_settings()
-    jobs = ClaudeJobs(s.claude_path, s.claude_workdir, s.claude_timeout_minutes, s.audit_log, s.dry_run)
+    jobs = ClaudeJobs(s.claude_path, s.claude_workdir, s.claude_timeout_minutes, s.audit_log, s.dry_run,
+                      project_dir=ROOT_DIR, skills_dir=s.skills_dir)
     return Context(settings=s, jobs=jobs)
 
 

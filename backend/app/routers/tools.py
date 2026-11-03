@@ -81,7 +81,7 @@ async def run_tool(
             audit.record(ctx.settings.audit_log, tool=item.tool, args=item.args, status="cancelled")
         return {"status": "ok", "message": "İş iptal edildi." if item else "İptal edilecek bekleyen iş yoktu."}
 
-    question = tool.confirm(call.args) if tool.confirm else None
+    question = tool.question(call.args, ctx)
     if question:
         item = pending.add(call.name, call.args, question)
         audit.record(ctx.settings.audit_log, tool=call.name, args=call.args, status="needs_confirmation",

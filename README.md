@@ -18,8 +18,9 @@ Mario, Windows bilgisayarında çalışan, Jarvis tarzı bir sesli ajandır. Tar
 
 | Komut | Örnek | Ne yapar |
 |---|---|---|
-| `get_pc_status` | "Bilgisayarın durumu ne?" | Ses ve çıkış cihazı, parlaklık, tema, bildirimler, Wi‑Fi/Bluetooth, ağ, güç planı, işlemci/bellek, pil durumunu tek çağrıda okur |
+| `get_pc_status` | "Bilgisayarın durumu ne?" | Ses ve çıkış cihazı, mikrofon, parlaklık, tema, bildirimler, Wi‑Fi/Bluetooth, ağ, güç planı, işlemci/bellek, pil durumunu tek çağrıda okur |
 | `set_volume` | "Sesi 30 yap", "sesi kıs", "sessize al" | pycaw (Core Audio) |
+| `set_microphone` | "Mikrofonu kapat", "mikrofonu aç" | Varsayılan kayıt cihazını tüm uygulamalar için sessize alır (pycaw). Kapatmak sesli onay ister: Mario'yu bu bilgisayarın mikrofonuyla kullanıyorsan o da seni duyamaz, geri açmak için komutu yazman gerekir |
 | `set_audio_output` | "Sesi monitöre ver" | Varsayılan çıkış cihazını değiştirir; ad belirsizse seçenekleri sayar |
 | `set_brightness` | "Parlaklığı artır" | Tüm monitörlerde DDC/CI ile |
 | `set_theme` | "Koyu temaya geç" | Kayıt defteri + `WM_SETTINGCHANGE` |
@@ -41,7 +42,34 @@ Mario, Windows bilgisayarında çalışan, Jarvis tarzı bir sesli ajandır. Tar
 | `send_email` 🔒 | "Ahmet'e yarın geliyorum diye mail at" | Alıcıyı, konuyu ve metni okuyup onay ister |
 | `reply_email` 🔒 | "Buna teşekkürler diye cevap yaz" | Aynı konuşma dizisinde yanıtlar |
 
+**Öğrenme**
+
+| Komut | Örnek | Ne yapar |
+|---|---|---|
+| `learn_skill` 🔒 | "WhatsApp'tan Ahmet'e yaz" (bilmediği bir iş) | "Bunu henüz bilmiyorum. İzin verirsen Claude sayesinde öğreneyim" diye sorar; evet dersen Claude Code'a yeteneği yazdırır |
+| `run_skill` | (öğrenilmiş her yetenek) | Öğrenilmiş bir yeteneği çalıştırır; yetenek yıkıcıysa önce onay ister |
+| `list_skills` | "Neler öğrendin?" | Öğrenilmiş yetenekleri sayar |
+| `forget_skill` 🔒 | "Döviz yeteneğini unut" | Klasörü `skills/_unutulan/` altına taşır, silmez |
+
 🔒 işaretli araçlar onay ister.
+
+## Bilmediğini öğrenir
+
+Mario bir isteği hiçbir araçla yapamıyorsa "bilmiyorum" demez:
+
+1. `learn_skill` çağırır. Sunucu, sesli onay akışıyla "Bunu henüz bilmiyorum. İzin verirsen Claude sayesinde öğreneyim: «…». Öğreneyim mi?" diye sorar.
+2. Sen "evet" dersin. Sunucu arka planda `claude -p`'yi **proje klasöründe** başlatır; böylece Claude, projedeki [`.claude/skills/mario-yetenek`](.claude/skills/mario-yetenek/SKILL.md) skill'ini yükler. Skill, Claude'a şunları söyler:
+   * var olan araçlara ve yeteneklere bak, aynısını yeniden yazma;
+   * `skills/<ad>/skill.json` ve `run.ps1` ya da `run.py` yaz; argümanlar stdin'den JSON olarak gelsin, son satır Mario'nun okuyacağı tek Türkçe cümle olsun;
+   * mesaj gönderme, silme, satın alma, ayar değiştirme gibi işler için `confirm` sorusu zorunlu;
+   * `check_skill.py` ile doğrula; yalnızca zararsızca dene, isteği kendin yerine getirme;
+   * yapılamıyorsa (program yok, giriş gerekiyor) yazma ve nedenini söyle.
+3. Sunucu, Claude'un "YETENEK: <ad>" cevabını diskteki dosyayla karşılaştırır ve manifesti doğrular. Claude'un söylediğine körü körüne güvenmez.
+4. Tarayıcı işin bittiğini görünce Mario'ya yeni yeteneği anlatan bir sistem notu gönderir. Mario öğrendiğini söyler ve ilk isteği hemen `run_skill` ile yapar.
+
+Live token'ı araç listesini kilitlediği için her yetenek ayrı bir fonksiyon olarak tanımlanmaz. Hepsi tek bir `run_skill` aracından geçer ve yetenekler her çağrıda diskten okunur. Böylece aynı sesli oturum içinde öğrenilen bir yetenek de hemen kullanılabilir. Sonraki oturumlarda yetenekler sistem talimatında listelenir.
+
+Güvenlik: öğrenme her seferinde senin sesli onayını ister. Claude yalnızca `skills/` altına yazabilir (`backend/`, `frontend/` ve `.claude/` yazma izinleri kapalı) ve yıkıcı komutlar yasak. Yıkıcı bir yeteneğin her çalıştırılması da ayrıca sesli onaydan geçer.
 
 ## Mimari
 
@@ -84,6 +112,17 @@ copy .env.example .env      # GEMINI_API_KEY'i doldur
 ```
 
 http://localhost:8100 adresini aç, **Başlat**'a bas ve konuş. Mikrofon yoksa komutları yazarak da verebilirsin.
+
+### Tek tıkla ve Windows açılınca
+
+```powershell
+powershell -ExecutionPolicy Bypass -File backend\scripts\install-shortcuts.ps1
+```
+
+* Masaüstüne bir **Mario** kısayolu koyar. Sunucu çalışmıyorsa onu pencere açmadan başlatır, sonra Mario'yu Chrome'da uygulama penceresi olarak açar.
+* Başlangıç klasörüne de bir kısayol koyar. Windows açılınca sunucu sessizce başlar.
+* Sunucu `pythonw` ile `scripts/serve.py` üzerinden çalışır; günlük `backend/data/server.log` dosyasına yazılır (1 MB'ta döner).
+* Kısayolları kaldırmak için aynı komutu `-Remove` ile çalıştır.
 
 Kendi programlarının kısayollarını `programs/` klasörüne koy ya da `.env` içinde `PROGRAMS_DIR` ile başka bir klasörü göster (ör. JARVIS'in `Programlar` klasörü).
 
@@ -141,12 +180,17 @@ backend/
   app/
     gemini.py         ephemeral token: sistem talimatı + araçlar kilitli
     tools/            araç kaydı; system (program, ekran görüntüsü, kapatma), pc (ayarlar),
-                      gmail, web (hava, saat), claude (Claude Code işleri)
+                      gmail, web (hava, saat), claude (Claude Code işleri ve öğrenme),
+                      skills (öğrenilmiş yetenekleri yükleme/çalıştırma)
     confirm.py        bekleyen işler + "evet" kontrolü
     audit.py          audit.jsonl
     routers/          /api/token, /api/tool, /api/confirm, /api/jobs, /api/audit, /api/screenshots
-  scripts/            screenshot.ps1, live_smoke.py, gmail_login.py
+  scripts/            screenshot.ps1, live_smoke.py, gmail_login.py,
+                      start-mario.ps1 + serve.py + install-shortcuts.ps1 (başlatma),
+                      check_skill.py (yetenek doğrulama)
   tests/
 frontend/             PWA: live.js, audio/ (Lucia'dan), transcript.js, session.js, app.js
 programs/             open_program'ın önce baktığı kısayollar
+skills/               Mario'nun öğrendiği yetenekler (kişisel, git'e girmez)
+.claude/skills/       mario-yetenek: Claude'un Mario'ya yetenek öğretirken izlediği skill
 ```

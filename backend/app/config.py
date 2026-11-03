@@ -50,6 +50,9 @@ class Settings(BaseSettings):
     claude_workdir: Path = ROOT_DIR / "claude-workspace"
     claude_timeout_minutes: int = 15
 
+    # Skills Claude Code taught Mario (see app/tools/skills.py).
+    skills_dir: Path = ROOT_DIR / "skills"
+
     data_dir: Path = BACKEND_DIR / "data"
 
     # OAuth client of type "Desktop app" from Google Cloud Console; see README.

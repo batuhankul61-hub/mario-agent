@@ -140,6 +140,41 @@ async def set_volume(args: dict, settings: Settings) -> dict:
     return ok(f"Ses seviyesi yüzde {level if level is not None else current['level']}.")
 
 
+def _mic_sync() -> dict | None:
+    from pycaw.pycaw import AudioUtilities  # noqa: PLC0415
+
+    with _com():
+        found = AudioUtilities.GetMicrophone()
+        if not found:
+            return None
+        mic = AudioUtilities.CreateDevice(found)
+        return {"device": mic.FriendlyName, "muted": bool(mic.EndpointVolume.GetMute())}
+
+
+def _set_mic_sync(mute: bool) -> None:
+    from pycaw.pycaw import AudioUtilities  # noqa: PLC0415
+
+    with _com():
+        AudioUtilities.CreateDevice(AudioUtilities.GetMicrophone()).EndpointVolume.SetMute(int(mute), None)
+
+
+async def set_microphone(args: dict, settings: Settings) -> dict:
+    """Mutes the default recording device for every app (Discord, Zoom, Chrome...)."""
+    mute = bool(args.get("mute", True))
+    mic = await asyncio.to_thread(_mic_sync)
+    if mic is None:
+        return err("Bu bilgisayarda varsayılan bir mikrofon yok.")
+    if mic["muted"] == mute:
+        return ok(f"Mikrofon zaten {'kapalı' if mute else 'açık'} ({mic['device']}).")
+    if settings.dry_run:
+        return ok(f"(deneme) Mikrofon {'kapatılacaktı' if mute else 'açılacaktı'}.")
+    await asyncio.to_thread(_set_mic_sync, mute)
+    if mute:
+        return ok(f"Mikrofon kapatıldı ({mic['device']}). Bu bilgisayardan konuşuyorsan seni artık duyamam; "
+                  "açmak için 'mikrofonu aç' yazabilirsin.")
+    return ok(f"Mikrofon açıldı ({mic['device']}).")
+
+
 async def set_audio_output(args: dict, settings: Settings) -> dict:
     outputs = await asyncio.to_thread(_outputs_sync)
     key, candidates = pick(args.get("device", ""), outputs)
@@ -396,7 +431,7 @@ def _system_sync() -> dict:
 async def get_pc_status(args: dict, settings: Settings) -> dict:
     """One read-only summary, so "durum ne?" needs a single call. Each part may fail on its own."""
     parts = {
-        "audio": _audio_sync, "brightness": _brightness_sync, "theme": _theme_sync,
+        "audio": _audio_sync, "microphone": _mic_sync, "brightness": _brightness_sync, "theme": _theme_sync,
         "notifications": _notifications_sync, "radios": _radios_sync, "network": _network_sync,
         "power_plans": _plans_sync, "system": _system_sync,
     }
@@ -406,6 +441,8 @@ async def get_pc_status(args: dict, settings: Settings) -> dict:
     said = []
     if a := data["audio"]:
         said.append(f"Ses yüzde {a['level']}{' (kapalı)' if a['muted'] else ''}, çıkış: {a['device']}")
+    if m := data["microphone"]:
+        said.append(f"mikrofon {'kapalı' if m['muted'] else 'açık'}")
     if b := data["brightness"]:
         said.append(f"parlaklık yüzde {max(b)}")
     if data["theme"]:

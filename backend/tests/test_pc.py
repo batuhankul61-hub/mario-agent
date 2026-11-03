@@ -47,6 +47,39 @@ async def test_volume_dry_run(settings, audio):
     assert audio["set"] == []
 
 
+@pytest.fixture
+def mic(monkeypatch):
+    state = {"device": "Mikrofon (TUF H1)", "muted": False, "set": []}
+    monkeypatch.setattr(pc, "_mic_sync", lambda: {k: state[k] for k in ("device", "muted")})
+    monkeypatch.setattr(pc, "_set_mic_sync", state["set"].append)
+    return state
+
+
+async def test_mute_microphone(settings, mic):
+    res = await pc.set_microphone({"mute": True}, settings)
+    assert res["status"] == "ok" and res["message"].startswith("Mikrofon kapatıldı")
+    assert mic["set"] == [True]
+
+
+async def test_microphone_already_in_wanted_state(settings, mic):
+    res = await pc.set_microphone({"mute": False}, settings)
+    assert res["message"] == "Mikrofon zaten açık (Mikrofon (TUF H1))."
+    assert mic["set"] == []
+
+
+async def test_no_microphone(settings, monkeypatch):
+    monkeypatch.setattr(pc, "_mic_sync", lambda: None)
+    assert (await pc.set_microphone({"mute": True}, settings))["status"] == "error"
+
+
+def test_mic_off_needs_confirmation_but_mic_on_does_not(client, mic):
+    mic["muted"] = True
+    on = client.post("/api/tool", json={"name": "set_microphone", "args": {"mute": False}}).json()
+    off = client.post("/api/tool", json={"name": "set_microphone", "args": {"mute": True}}).json()
+    assert on["status"] == "ok" and mic["set"] == [False]
+    assert off["status"] == "needs_confirmation" and "duyamam" in off["question"]
+
+
 OUTPUTS = {
     "id-headset": "Kulaklıklar (2- TUF GAMING H1 Wireless)",
     "id-legion": "2 - Legion 25-10 (AMD High Definition Audio Device)",
@@ -238,7 +271,7 @@ async def test_sleep_dry_run(settings, monkeypatch):
     assert slept == []
 
 
-async def test_status_survives_a_failing_part(settings, monkeypatch, audio):
+async def test_status_survives_a_failing_part(settings, monkeypatch, audio, mic):
     def broken():
         raise OSError("no DDC")
 
@@ -255,6 +288,6 @@ async def test_status_survives_a_failing_part(settings, monkeypatch, audio):
 
     assert res["brightness"] is None
     assert res["message"] == (
-        "Ses yüzde 40, çıkış: Kulaklıklar (TUF H1). Koyu tema. Bildirimler susturulmuş. Bluetooth açık. "
+        "Ses yüzde 40, çıkış: Kulaklıklar (TUF H1). Mikrofon açık. Koyu tema. Bildirimler susturulmuş. Bluetooth açık. "
         "Kablolu: Ethernet (1 Gbit/s). Güç planı Dengeli. İşlemci yüzde 12, bellek yüzde 70."
     )

@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from ..config import Settings
-from . import claude, gmail, pc, system, web
+from . import claude, gmail, pc, skills, system, web
 
 Result = dict[str, Any]
 
@@ -28,6 +28,13 @@ class Tool:
     # Destructive tools only run after the user confirms by voice. Returns the
     # question to ask, or None when these particular args are harmless.
     confirm: Callable[[dict], str | None] | None = None
+    # Same, for questions that depend on server state (a learned skill's manifest).
+    confirm_ctx: Callable[[dict, "Context"], str | None] | None = None
+
+    def question(self, args: dict, ctx: "Context") -> str | None:
+        if self.confirm_ctx:
+            return self.confirm_ctx(args, ctx)
+        return self.confirm(args) if self.confirm else None
 
     def declaration(self) -> dict:
         decl: dict[str, Any] = {"name": self.name, "description": self.description}
@@ -119,10 +126,49 @@ TOOLS: dict[str, Tool] = {
             lambda a, c: c.jobs.status(a.get("job_id") or None),
             {"job_id": _str("İsteğe bağlı görev numarası.")},
         ),
+        # ---------- learning ----------
+        Tool(
+            "learn_skill",
+            "Hiçbir aracın ya da öğrenilmiş yeteneğin karşılamadığı bir istek için çağır: Claude Code'un bu işi "
+            "kalıcı bir yetenek olarak öğretmesini başlatır. Önce kullanıcıdan izin ister.",
+            lambda a, c: c.jobs.learn(a.get("request", "")),
+            {"request": _str("Kullanıcının isteği, kendi sözlerine yakın ve eksiksiz.")},
+            ("request",),
+            confirm=lambda a: (
+                f"Bunu henüz bilmiyorum. İzin verirsen Claude sayesinde öğreneyim: "
+                f"«{a.get('request', '').strip().rstrip('.!?')}». "
+                "Öğreneyim mi?"
+            ),
+        ),
+        Tool(
+            "run_skill",
+            "Öğrenilmiş bir yeteneği çalıştırır. Yetenekler ve parametreleri sistem talimatında ya da "
+            "list_skills sonucunda yazar.",
+            _with_settings(skills.run_skill),
+            {
+                "name": _str("Yeteneğin adı."),
+                "args_json": _str('Parametreler, JSON nesnesi olarak, ör. {"kisi": "Ahmet", "mesaj": "Geliyorum"}.'),
+            },
+            ("name",),
+            confirm_ctx=lambda a, c: skills.skill_question(a, c.settings),
+        ),
+        Tool(
+            "list_skills",
+            "Claude sayesinde öğrenilmiş yetenekleri listeler.",
+            _with_settings(skills.list_skills),
+        ),
+        Tool(
+            "forget_skill",
+            "Öğrenilmiş bir yeteneği unutur (klasörü skills/_unutulan altına taşınır). Sesli onay gerekir.",
+            _with_settings(skills.forget_skill),
+            {"name": _str("Yeteneğin adı.")},
+            ("name",),
+            confirm=lambda a: f"{a.get('name', '')} yeteneğini unutayım mı?",
+        ),
         # ---------- PC settings ----------
         Tool(
             "get_pc_status",
-            "Ses seviyesi ve çıkış cihazı, parlaklık, tema, bildirimler, Wi-Fi/Bluetooth, ağ, güç planı, "
+            "Ses seviyesi ve çıkış cihazı, mikrofon, parlaklık, tema, bildirimler, Wi-Fi/Bluetooth, ağ, güç planı, "
             "işlemci/bellek ve pil durumunu tek seferde okur.",
             _with_settings(pc.get_pc_status),
         ),
@@ -135,6 +181,18 @@ TOOLS: dict[str, Tool] = {
                 "change": _str("10 puan artır ya da azalt.", ["up", "down"]),
                 "mute": _bool("true: sesi kapat, false: sesi aç."),
             },
+        ),
+        Tool(
+            "set_microphone",
+            "Bilgisayarın varsayılan mikrofonunu tüm uygulamalar için kapatır (sessize alır) ya da açar. "
+            "Kapatmak sesli onay ister.",
+            _with_settings(pc.set_microphone),
+            {"mute": _bool("true: mikrofonu kapat, false: mikrofonu aç.")},
+            ("mute",),
+            confirm=lambda a: (
+                "Mikrofon kapatılsın mı? Bu bilgisayardan konuşuyorsan seni duyamam, açmak için yazman gerekir."
+                if a.get("mute", True) else None
+            ),
         ),
         Tool(
             "set_audio_output",

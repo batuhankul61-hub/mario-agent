@@ -15,8 +15,13 @@ claude-workspace/
 programs/*
 !programs/README.md
 
-# OS / editor
-.claude/
+# Skills Mario learned on this PC (personal); the folder's README stays
+skills/*
+!skills/README.md
+
+# OS / editor (the mario-yetenek skill Claude uses to teach Mario is part of the project)
+.claude/*
+!.claude/skills/
 .DS_Store
 Thumbs.db
 .vscode/
