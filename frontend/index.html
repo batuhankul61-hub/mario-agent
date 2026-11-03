@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Mario · sesli asistan</title>
+  <meta name="description" content="Sesle komut alan kişisel asistan: program açar, ekran görüntüsü alır, hava durumuna bakar, Claude Code'a iş verir.">
+  <meta name="theme-color" content="#0d1117">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Mario">
+  <meta name="referrer" content="no-referrer">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon.svg">
+  <link rel="stylesheet" href="css/style.css">
+  <script type="module" src="js/app.js"></script>
+</head>
+<body data-state="idle">
+  <header class="top">
+    <b class="brand">MARIO</b>
+    <span class="status"><i></i><em id="status-text">HAZIR</em></span>
+  </header>
+
+  <main id="log" class="log" aria-live="polite">
+    <section class="intro">
+      <h1>Buyur, dinliyorum.</h1>
+      <p>Başlat'a bas ve konuş. Örnekler:</p>
+      <ul>
+        <li>“Not defterini aç.”</li>
+        <li>“Ekran görüntüsü al.”</li>
+        <li>“İstanbul'da hava nasıl?”</li>
+        <li>“Claude'a Masaüstündeki dosyaları listelet.”</li>
+        <li>“Bilgisayarı kapat.” <small>(sesli onay ister)</small></li>
+      </ul>
+    </section>
+  </main>
+
+  <div id="confirm" class="confirm" hidden>
+    <p id="confirm-q"></p>
+    <div class="row">
+      <button class="btn ghost" id="confirm-no" type="button">İptal</button>
+      <button class="btn danger" id="confirm-yes" type="button">Onayla</button>
+    </div>
+  </div>
+
+  <footer class="bottom">
+    <div class="meter" aria-hidden="true"><span id="level"></span></div>
+    <form id="text-form" class="text-form" autocomplete="off">
+      <input id="text" placeholder="Yaz ya da konuş…" enterkeyhint="send" spellcheck="false" aria-label="Komut yaz" disabled>
+      <button class="btn ghost" aria-label="Gönder" disabled>›</button>
+    </form>
+    <div class="row">
+      <label class="toggle"><input type="checkbox" id="speaker"> Hoparlör modu</label>
+      <button id="main" class="btn primary" type="button">Başlat</button>
+    </div>
+  </footer>
+
+  <dialog id="code-dialog">
+    <form method="dialog">
+      <h2>Erişim kodu</h2>
+      <p class="muted">Mario bilgisayarında komut çalıştırır, bu yüzden telefondan bağlanmak için <code>backend/.env</code> içindeki <code>ACCESS_CODE</code> gerekir.</p>
+      <input name="code" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Erişim kodu">
+      <div class="row">
+        <button class="btn ghost" value="cancel">Vazgeç</button>
+        <button class="btn primary" value="ok">Devam</button>
+      </div>
+    </form>
+  </dialog>
+</body>
+</html>

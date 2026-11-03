@@ -1,0 +1,23 @@
+# Secrets
+.env
+*.env
+!.env.example
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Runtime data (audit log), Claude's scratch folder, personal shortcuts
+backend/data/
+claude-workspace/
+programs/*
+!programs/README.md
+
+# OS / editor
+.claude/
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

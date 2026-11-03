@@ -1,0 +1,15 @@
+{
+  "name": "Mario · sesli asistan",
+  "short_name": "Mario",
+  "description": "Sesle komut alan kişisel asistan.",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0d1117",
+  "theme_color": "#0d1117",
+  "icons": [
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
