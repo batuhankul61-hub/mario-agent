@@ -77,7 +77,9 @@ export class Agent extends EventTarget {
     await this.live.connect();
     this.setState("listening");
     this.live.sendText(KICKOFF);
-    this.timer = setTimeout(() => this.emit("timeup"), max_session_minutes * 60_000);
+    this.startedAt = Date.now();
+    this.limitMs = max_session_minutes * 60_000;
+    this.timer = setTimeout(() => this.emit("timeup"), this.limitMs);
   }
 
   onMic({ pcm, rms }) {
@@ -127,7 +129,7 @@ export class Agent extends EventTarget {
 
     if (result.status === "needs_confirmation") {
       this.confirmMark = Date.now();
-      this.emit("confirm", { id: result.confirmation_id, question: result.question });
+      this.emit("confirm", { id: result.confirmation_id, question: result.question, tool: name });
     }
     const answered = name === "cancel_action" || (name === "confirm_action" && result.status !== "not_confirmed");
     if (answered) this.emit("confirmDone", args.confirmation_id);

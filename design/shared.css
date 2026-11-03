@@ -1,0 +1,219 @@
+/* Shared ground for the three Apple-style Mario concepts: system colours, type, the orb,
+   result snippets, the alert, and the demo panel. Concepts add only their own layout. */
+
+@property --a { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+
+:root {
+  /* Light: iOS system colours */
+  --bg: #ffffff;
+  --grouped: #f2f2f7;
+  --fill: #ffffff;
+  --fill-2: #f2f2f7;
+  --label: #000000;
+  --label-2: #5f5f66;
+  --label-3: #6b6b70;
+  --sep: rgb(60 60 67 / .18);
+  --blue: #007aff;
+  /* Blue that carries text: a touch deeper than system blue so it reads at 4.5:1. */
+  --blue-text: #0062cc;
+  --bubble: #0071e3;
+  --red: #ff3b30;
+  --green: #34c759;
+  --orange: #ff9500;
+  --glass: rgb(255 255 255 / .72);
+  --glass-edge: rgb(255 255 255 / .9);
+  --shadow: 0 10px 30px -8px rgb(0 0 0 / .16), 0 2px 6px -2px rgb(0 0 0 / .08);
+  /* Mario's light: the Apple Intelligence spectrum, warm to cool */
+  --g1: #ff8a3d;
+  --g2: #ff4f8b;
+  --g3: #b25cff;
+  --g4: #4d7dff;
+  --g5: #38d3ff;
+  color-scheme: light;
+}
+[data-theme="dark"] {
+  --bg: #000000;
+  --grouped: #000000;
+  --fill: #1c1c1e;
+  --fill-2: #2c2c2e;
+  --label: #ffffff;
+  --label-2: #a1a1a8;
+  --label-3: #8e8e93;
+  --sep: rgb(84 84 88 / .55);
+  --blue: #0a84ff;
+  --blue-text: #4ba3ff;
+  --bubble: #0a6bd6;
+  --red: #ff453a;
+  --green: #30d158;
+  --orange: #ff9f0a;
+  --glass: rgb(30 30 32 / .62);
+  --glass-edge: rgb(255 255 255 / .12);
+  --shadow: 0 14px 40px -10px rgb(0 0 0 / .7), 0 2px 8px -2px rgb(0 0 0 / .5);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--label);
+  /* SF Pro on Apple devices; Inter is the closest stand-in elsewhere. */
+  font: 400 17px/1.4 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", system-ui, sans-serif;
+  letter-spacing: -.01em;
+  -webkit-font-smoothing: antialiased;
+  transition: background-color .35s, color .35s;
+}
+::selection { background: color-mix(in srgb, var(--blue) 30%, transparent); }
+button { font: inherit; color: inherit; }
+svg.i { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+/* Liquid-glass material: translucent, blurred, with a bright hairline edge. */
+.glass {
+  background: var(--glass);
+  backdrop-filter: blur(24px) saturate(1.8);
+  -webkit-backdrop-filter: blur(24px) saturate(1.8);
+  box-shadow: var(--shadow), inset 0 0 0 .5px var(--glass-edge), inset 0 1px 0 var(--glass-edge);
+}
+
+/* ---------- The orb ---------- */
+.orb {
+  --s: 44px;
+  --speed: 9s;
+  position: relative;
+  width: var(--s);
+  aspect-ratio: 1;
+  flex: none;
+  border-radius: 50%;
+  isolation: isolate;
+  overflow: hidden;
+  transition: transform .5s cubic-bezier(.34, 1.56, .64, 1), filter .4s;
+}
+.orb::before {
+  content: "";
+  position: absolute;
+  inset: -30%;
+  background: conic-gradient(from var(--a), var(--g1), var(--g2), var(--g3), var(--g4), var(--g5), var(--g1));
+  filter: blur(calc(var(--s) * .12));
+  animation: turn var(--speed) linear infinite;
+}
+.orb::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 32% 28%, rgb(255 255 255 / .85), transparent 38%),
+    radial-gradient(circle at 70% 80%, rgb(255 255 255 / .25), transparent 45%);
+  box-shadow: inset 0 0 calc(var(--s) * .18) rgb(255 255 255 / .55);
+}
+@keyframes turn { to { --a: 360deg; } }
+[data-state="idle"] .orb { --speed: 18s; filter: saturate(.55) brightness(.95); }
+[data-state="listening"] .orb { --speed: 6s; animation: breathe 2.4s ease-in-out infinite; }
+[data-state="speaking"] .orb { --speed: 4s; animation: talk .9s ease-in-out infinite; }
+[data-state="working"] .orb { --speed: 1.4s; }
+@keyframes breathe { 50% { transform: scale(1.06); } }
+@keyframes talk { 0%, 100% { transform: scale(1); } 30% { transform: scale(1.1); } 60% { transform: scale(.97); } }
+
+/* Soft halo of the same light behind an orb (used where the orb is the hero). */
+.halo { position: relative; display: grid; place-items: center; }
+.halo::before {
+  content: "";
+  position: absolute;
+  inset: -18%;
+  border-radius: 50%;
+  background: conic-gradient(from 90deg, var(--g1), var(--g2), var(--g3), var(--g4), var(--g5), var(--g1));
+  filter: blur(48px);
+  opacity: .35;
+  transition: opacity .5s;
+}
+[data-state="idle"] .halo::before { opacity: .12; }
+[data-state="speaking"] .halo::before { opacity: .55; }
+
+/* ---------- Result snippets (Siri-style cards) ---------- */
+.snippet { border-radius: 22px; background: var(--fill); padding: 16px 18px; }
+[data-theme="light"] .snippet, :root:not([data-theme]) .snippet { box-shadow: 0 1px 3px rgb(0 0 0 / .06), 0 0 0 .5px var(--sep); }
+.snippet .src { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 13px; font-weight: 600; color: var(--label-2); }
+.snippet .src .badge { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 6px; color: #fff; font-size: 13px; }
+.weather .now { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+.weather .temp { font-size: 52px; font-weight: 300; line-height: 1; letter-spacing: -.03em; }
+.weather .cond { text-align: right; font-size: 15px; color: var(--label-2); }
+.weather .cond b { display: block; color: var(--label); font-size: 17px; font-weight: 600; }
+.mail-list { margin: 0; padding: 0; list-style: none; }
+.mail-list li { display: grid; grid-template-columns: 1fr auto; gap: 0 12px; padding: 10px 0; border-top: .5px solid var(--sep); }
+.mail-list li:first-child { border-top: 0; padding-top: 0; }
+.mail-list b { font-weight: 600; font-size: 15px; }
+.mail-list time { font-size: 13px; color: var(--label-3); }
+.mail-list span { grid-column: 1 / -1; font-size: 15px; color: var(--label-2); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.mail-list li::before { content: none; }
+.unread b::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 7px; border-radius: 50%; background: var(--blue); vertical-align: 1px; }
+
+/* A tool at work, shown only in the working state. */
+.task { display: none; align-items: center; gap: 10px; font-size: 15px; color: var(--label-2); }
+[data-state="working"] .task { display: flex; }
+.spinner { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--sep); border-top-color: var(--label-2); animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ---------- Alert (confirmation) ---------- */
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: none;
+  place-items: center;
+  padding: 24px;
+  background: rgb(0 0 0 / .32);
+  animation: fade .2s ease-out;
+}
+[data-confirm] .scrim { display: grid; }
+.alert {
+  width: min(300px, 100%);
+  border-radius: 16px;
+  overflow: hidden;
+  text-align: center;
+  animation: pop .35s cubic-bezier(.34, 1.56, .64, 1);
+}
+.alert .body { padding: 20px 18px 16px; }
+.alert h2 { margin: 0 0 4px; font-size: 17px; font-weight: 600; letter-spacing: -.02em; }
+.alert p { margin: 0; font-size: 13px; line-height: 1.35; color: var(--label); }
+.alert .actions { display: grid; grid-template-columns: 1fr 1fr; border-top: .5px solid var(--sep); }
+.alert button { min-height: 44px; border: 0; background: none; color: var(--blue-text); font-size: 17px; cursor: pointer; }
+.alert button + button { border-left: .5px solid var(--sep); }
+.alert .cancel { font-weight: 600; }
+.alert .destructive { color: var(--red); }
+.alert button:active { background: var(--fill-2); }
+@keyframes fade { from { opacity: 0; } }
+@keyframes pop { from { transform: scale(1.12); opacity: 0; } }
+
+/* ---------- State-dependent text ---------- */
+/* Elements marked data-when="…" show only in those states and keep their own display otherwise. */
+[data-state="idle"] [data-when]:not([data-when~="idle"]),
+[data-state="listening"] [data-when]:not([data-when~="listening"]),
+[data-state="speaking"] [data-when]:not([data-when~="speaking"]),
+[data-state="working"] [data-when]:not([data-when~="working"]) { display: none !important; }
+
+/* ---------- Demo panel (not part of the design) ---------- */
+.demo {
+  position: fixed;
+  right: 12px;
+  bottom: 12px;
+  z-index: 100;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  max-width: calc(100% - 24px);
+  padding: 6px;
+  border-radius: 14px;
+  background: rgb(20 20 22 / .86);
+  color: #fff;
+  font: 500 12px/1 -apple-system, "Inter", system-ui, sans-serif;
+  letter-spacing: 0;
+  box-shadow: 0 8px 24px rgb(0 0 0 / .3);
+}
+.demo b { align-self: center; padding: 0 6px; color: #9a9aa0; font-weight: 600; }
+.demo button { min-height: 28px; padding: 0 10px; border: 0; border-radius: 8px; background: rgb(255 255 255 / .1); color: #fff; cursor: pointer; }
+.demo button[aria-pressed="true"] { background: #fff; color: #000; }
+.demo .gap { width: 1px; margin: 4px 2px; background: rgb(255 255 255 / .2); }
+
+@media (prefers-reduced-motion: reduce) {
+  .orb, .orb::before, .spinner, .alert, .scrim { animation: none !important; }
+}

@@ -7,6 +7,7 @@ export class AudioIO {
     this.stream = null;
     this.mic = null;
     this.player = null;
+    this.analyser = null;
     this.onChunk = () => {};
     this.onPlayback = () => {};
   }
@@ -24,7 +25,10 @@ export class AudioIO {
 
     this.player = new AudioWorkletNode(this.ctx, "player-processor", { outputChannelCount: [1] });
     this.player.port.onmessage = (e) => this.onPlayback(e.data);
-    this.player.connect(this.ctx.destination);
+    // The analyser only measures Mario's voice for the orb; audio passes through unchanged.
+    this.analyser = this.ctx.createAnalyser();
+    this.analyser.fftSize = 512;
+    this.player.connect(this.analyser).connect(this.ctx.destination);
 
     if (!mic) return;
     this.stream = await navigator.mediaDevices.getUserMedia({
@@ -40,6 +44,16 @@ export class AudioIO {
     this.player?.port.postMessage({ type: "push", samples: int16 }, [int16.buffer]);
   }
 
+  /** RMS of what Mario is saying right now, 0..1. */
+  outputLevel() {
+    if (!this.analyser) return 0;
+    const buf = new Float32Array(this.analyser.fftSize);
+    this.analyser.getFloatTimeDomainData(buf);
+    let sum = 0;
+    for (const v of buf) sum += v * v;
+    return Math.sqrt(sum / buf.length);
+  }
+
   clearPlayback() {
     this.player?.port.postMessage({ type: "clear" });
   }
@@ -48,7 +62,8 @@ export class AudioIO {
     this.stream?.getTracks().forEach((t) => t.stop());
     this.mic?.disconnect();
     this.player?.disconnect();
+    this.analyser?.disconnect();
     if (this.ctx && this.ctx.state !== "closed") await this.ctx.close();
-    this.ctx = this.stream = this.mic = this.player = null;
+    this.ctx = this.stream = this.mic = this.player = this.analyser = null;
   }
 }

@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Mario · A Kenar ışığı</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300..700&display=swap">
+  <link rel="stylesheet" href="shared.css">
+  <style>
+    body { display: flex; flex-direction: column; height: 100dvh; background: var(--grouped); }
+
+    /* The screen's edge lights up while Mario listens or speaks. */
+    .edge, .edge-soft {
+      position: fixed;
+      inset: 0;
+      z-index: 40;
+      pointer-events: none;
+      border-radius: 0;
+      background: conic-gradient(from var(--a), var(--g1), var(--g2), var(--g3), var(--g4), var(--g5), var(--g1));
+      -webkit-mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+      mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+      opacity: 0;
+      transition: opacity .6s ease, padding .6s ease;
+      animation: turn 5s linear infinite;
+    }
+    .edge { padding: 3px; filter: blur(1.5px); }
+    .edge-soft { padding: min(18px, 3vw); filter: blur(22px); }
+    [data-state="listening"] .edge { opacity: .9; }
+    [data-state="listening"] .edge-soft { opacity: .55; }
+    [data-state="speaking"] .edge { opacity: 1; padding: 4px; }
+    [data-state="speaking"] .edge-soft { opacity: .8; padding: min(26px, 4vw); animation-duration: 3s; }
+    [data-state="working"] .edge { opacity: .5; animation-duration: 1.6s; }
+
+    .wrap { width: min(100%, 680px); margin: 0 auto; padding: 0 20px; }
+
+    header { padding: 22px 0 6px; display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+    header h1 { margin: 0; font-size: 34px; font-weight: 700; letter-spacing: -.03em; line-height: 1.1; }
+    header .sub { margin: 2px 0 0; font-size: 15px; color: var(--label-2); display: flex; align-items: center; gap: 6px; }
+    header .sub i { width: 7px; height: 7px; border-radius: 50%; background: var(--label-3); }
+    [data-state="listening"] header .sub i, [data-state="speaking"] header .sub i { background: var(--green); }
+    [data-state="working"] header .sub i { background: var(--orange); }
+    .icon-btn { display: grid; place-items: center; width: 36px; height: 36px; border: 0; border-radius: 50%; background: var(--fill); color: var(--blue-text); font-size: 19px; cursor: pointer; box-shadow: 0 0 0 .5px var(--sep); }
+
+    main { flex: 1; overflow-y: auto; padding-bottom: 120px; }
+    .thread { display: flex; flex-direction: column; gap: 14px; padding: 18px 0; }
+    .you { margin: 8px 0 0; align-self: flex-end; max-width: 80%; font-size: 15px; color: var(--label-2); text-align: right; }
+    .mario { margin: 0; font-size: 22px; line-height: 1.32; font-weight: 500; letter-spacing: -.02em; text-wrap: pretty; }
+    .live { color: var(--label-3); }
+
+    .dock {
+      position: fixed;
+      left: 50%;
+      bottom: max(20px, env(safe-area-inset-bottom));
+      z-index: 30;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: min(calc(100% - 32px), 640px);
+      padding: 7px 7px 7px 9px;
+      border-radius: 999px;
+      transform: translateX(-50%);
+    }
+    .dock .orb { --s: 38px; cursor: pointer; }
+    .dock input { flex: 1; min-width: 0; border: 0; background: none; color: var(--label); font: inherit; font-size: 17px; outline: none; }
+    .dock input::placeholder { color: var(--label-3); }
+    .dock .mic { display: grid; place-items: center; width: 38px; height: 38px; border: 0; border-radius: 50%; background: var(--bubble); color: #fff; font-size: 18px; cursor: pointer; }
+    [data-state="listening"] .dock .mic, [data-state="speaking"] .dock .mic { background: var(--red); }
+  </style>
+</head>
+<body>
+  <div class="edge-soft"></div>
+  <div class="edge"></div>
+
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>Mario</h1>
+        <p class="sub"><i></i><span data-status>Dinliyor</span></p>
+      </div>
+      <button class="icon-btn" aria-label="Ayarlar">
+        <svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+      </button>
+    </header>
+  </div>
+
+  <main>
+    <div class="wrap thread">
+      <p class="you">İzmir'de hava nasıl?</p>
+      <section class="snippet weather">
+        <div class="src"><span class="badge" style="background:#4d9bff">
+          <svg class="i" viewBox="0 0 24 24"><path d="M7 18h10a4 4 0 0 0 .5-7.97A6 6 0 0 0 6 11a3.5 3.5 0 0 0 1 7z"/></svg></span>Hava Durumu</div>
+        <div class="now">
+          <span class="temp">21°</span>
+          <span class="cond"><b>İzmir</b>Parçalı bulutlu · Rüzgâr 14 km/sa</span>
+        </div>
+      </section>
+      <p class="mario">İzmir'de şu an 21 derece, parçalı bulutlu. Akşama doğru hafif rüzgâr var.</p>
+
+      <p class="you">Okunmamış maillerim var mı?</p>
+      <section class="snippet">
+        <div class="src"><span class="badge" style="background:#1e8cff">
+          <svg class="i" viewBox="0 0 24 24"><path d="M3 6h18v12H3zm0 0 9 7 9-7"/></svg></span>Mail · 3 okunmamış</div>
+        <ul class="mail-list">
+          <li class="unread"><b>Ayşe Demir</b><time>09:42</time><span>Yarınki sunum için son slaytlar</span></li>
+          <li class="unread"><b>Kerem Aydın</b><time>08:15</time><span>Fatura · Ekim 2026</span></li>
+          <li class="unread"><b>GitHub</b><time>Dün</time><span>[mario] Yeni bir yorum var</span></li>
+        </ul>
+      </section>
+      <p class="mario">Üç okunmamış mailin var. En yenisi Ayşe'den, yarınki sunumla ilgili.</p>
+
+      <p class="you" data-when="listening">Ahmet'e yarın geliyorum diye <span class="live">yaz…</span></p>
+      <p class="task"><span class="spinner"></span>Claude'a görev veriliyor: Masaüstündeki dosyaları listele</p>
+    </div>
+  </main>
+
+  <div class="dock glass">
+    <span class="orb" role="button" aria-label="Mario'yu başlat"></span>
+    <input placeholder="Mario'ya yaz" aria-label="Komut yaz">
+    <button class="mic" aria-label="Dinlemeyi aç/kapat">
+      <svg class="i" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+    </button>
+  </div>
+
+  <div class="scrim">
+    <div class="alert glass" role="alertdialog" aria-labelledby="al-t" aria-describedby="al-d">
+      <div class="body">
+        <h2 id="al-t">E-posta gönderilsin mi?</h2>
+        <p id="al-d">Ahmet Yılmaz'a «Yarın geliyorum» yazılacak. İstersen sesle de «evet» diyebilirsin.</p>
+      </div>
+      <div class="actions"><button class="cancel">Vazgeç</button><button>Gönder</button></div>
+    </div>
+  </div>
+
+  <script src="demo.js"></script>
+</body>
+</html>

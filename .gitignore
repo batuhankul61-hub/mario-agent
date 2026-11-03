@@ -29,3 +29,6 @@ Thumbs.db
 
 # Gmail OAuth client (the token lives in backend/data/)
 backend/gmail-client.json
+
+# Impeccable design detector cache
+.impeccable/hook.cache.json
