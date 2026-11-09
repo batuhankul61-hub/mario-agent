@@ -21,7 +21,10 @@ import httpx
 from ..config import Settings
 
 API = "https://gmail.googleapis.com/gmail/v1/users/me"
-SCOPES = ["https://www.googleapis.com/auth/gmail.readonly", "https://www.googleapis.com/auth/gmail.send"]
+SCOPES = [
+    "https://www.googleapis.com/auth/gmail.readonly",
+    "https://www.googleapis.com/auth/gmail.send",
+]
 BODY_LIMIT = 3000
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
@@ -51,7 +54,9 @@ def _token(settings: Settings) -> str:
 
 def _client(settings: Settings) -> httpx.Client:
     token = "test-token" if transport else _token(settings)
-    return httpx.Client(base_url=API, headers={"Authorization": f"Bearer {token}"}, timeout=20, transport=transport)
+    return httpx.Client(
+        base_url=API, headers={"Authorization": f"Bearer {token}"}, timeout=20, transport=transport
+    )
 
 
 def _call(fn, settings: Settings, *args) -> dict:
@@ -60,11 +65,17 @@ def _call(fn, settings: Settings, *args) -> dict:
         with _client(settings) as client:
             return fn(client, *args)
     except NotConnected:
-        return {"status": "error", "message": "Gmail bağlı değil. Bilgisayarda scripts\\gmail_login.py bir kez çalıştırılmalı."}
+        return {
+            "status": "error",
+            "message": "Gmail bağlı değil. Bilgisayarda scripts\\gmail_login.py bir kez çalıştırılmalı.",
+        }
     except httpx.HTTPStatusError as exc:
         if exc.response.status_code == 404:
             return {"status": "error", "message": "Bu e-posta bulunamadı."}
-        return {"status": "error", "message": f"Gmail isteği başarısız oldu ({exc.response.status_code})."}
+        return {
+            "status": "error",
+            "message": f"Gmail isteği başarısız oldu ({exc.response.status_code}).",
+        }
     except httpx.HTTPError as exc:
         return {"status": "error", "message": f"Gmail'e ulaşılamadı ({exc.__class__.__name__})."}
 
@@ -99,25 +110,49 @@ def body_text(payload: dict) -> str:
     if plain_parts:
         text = "\n".join(plain_parts)
     else:
-        text = re.sub(r"<(script|style)[^>]*>.*?</\1>", " ", "\n".join(html_parts), flags=re.S | re.I)
+        text = re.sub(
+            r"<(script|style)[^>]*>.*?</\1>", " ", "\n".join(html_parts), flags=re.S | re.I
+        )
         text = html.unescape(re.sub(r"<[^>]+>", " ", text)).replace("\xa0", " ")
     return re.sub(r"[ \t]+", " ", re.sub(r"\n\s*\n+", "\n\n", text)).strip()
 
 
 def _list(client: httpx.Client, query: str, limit: int) -> dict:
-    found = client.get("/messages", params={"q": query, "maxResults": limit}).raise_for_status().json()
+    found = (
+        client.get("/messages", params={"q": query, "maxResults": limit}).raise_for_status().json()
+    )
     items = []
     for ref in found.get("messages", []):
-        msg = client.get(f"/messages/{ref['id']}", params={
-            "format": "metadata", "metadataHeaders": ["From", "Subject", "Date"],
-        }).raise_for_status().json()
+        msg = (
+            client.get(
+                f"/messages/{ref['id']}",
+                params={
+                    "format": "metadata",
+                    "metadataHeaders": ["From", "Subject", "Date"],
+                },
+            )
+            .raise_for_status()
+            .json()
+        )
         h = _headers(msg)
-        items.append({"id": msg["id"], "from": _sender(h.get("from", "")), "subject": h.get("subject", "(konusuz)"),
-                      "date": h.get("date", ""), "snippet": html.unescape(msg.get("snippet", ""))})
+        items.append(
+            {
+                "id": msg["id"],
+                "from": _sender(h.get("from", "")),
+                "subject": h.get("subject", "(konusuz)"),
+                "date": h.get("date", ""),
+                "snippet": html.unescape(msg.get("snippet", "")),
+            }
+        )
     if not items:
         return {"status": "ok", "message": "Bu aramaya uyan e-posta yok.", "emails": []}
     lines = "; ".join(f"{i['from']}: {i['subject']}" for i in items)
-    return {"status": "ok", "message": f"{len(items)} e-posta: {lines}.", "untrusted_content": True, "emails": items}
+    return {
+        "status": "ok",
+        "message": f"{len(items)} e-posta: {lines}.",
+        "untrusted_content": True,
+        "emails": items,
+    }
 
 
 def _read(client: httpx.Client, message_id: str) -> dict:
@@ -137,32 +172,62 @@ def _read(client: httpx.Client, message_id: str) -> dict:
 
 
 def _find_address(client: httpx.Client, name: str) -> dict:
-    found = client.get("/messages", params={"q": f"from:({name}) OR to:({name})", "maxResults": 10}).raise_for_status().json()
+    found = (
+        client.get("/messages", params={"q": f"from:({name}) OR to:({name})", "maxResults": 10})
+        .raise_for_status()
+        .json()
+    )
     wanted = name.casefold()
     seen: dict[str, str] = {}
     for ref in found.get("messages", []):
-        msg = client.get(f"/messages/{ref['id']}", params={
-            "format": "metadata", "metadataHeaders": ["From", "To", "Cc"],
-        }).raise_for_status().json()
+        msg = (
+            client.get(
+                f"/messages/{ref['id']}",
+                params={
+                    "format": "metadata",
+                    "metadataHeaders": ["From", "To", "Cc"],
+                },
+            )
+            .raise_for_status()
+            .json()
+        )
         h = _headers(msg)
         for display, addr in getaddresses([h.get("from", ""), h.get("to", ""), h.get("cc", "")]):
             if addr and (wanted in display.casefold() or wanted in addr.casefold()):
                 seen.setdefault(addr.lower(), display or addr)
     if not seen:
-        return {"status": "error", "message": f"'{name}' için bir e-posta adresi bulamadım. Adresi söyleyebilir misin?"}
+        return {
+            "status": "error",
+            "message": f"'{name}' için bir e-posta adresi bulamadım. Adresi söyleyebilir misin?",
+        }
     options = [f"{display} <{addr}>" for addr, display in seen.items()]
-    return {"status": "ok" if len(options) == 1 else "ambiguous",
-            "message": ("Adres: " if len(options) == 1 else "Birden fazla adres var: ") + ", ".join(options) + ".",
-            "addresses": list(seen)}
+    return {
+        "status": "ok" if len(options) == 1 else "ambiguous",
+        "message": ("Adres: " if len(options) == 1 else "Birden fazla adres var: ")
+        + ", ".join(options)
+        + ".",
+        "addresses": list(seen),
+    }
 
 
 def _send(client: httpx.Client, mail: EmailMessage, thread_id: str | None) -> dict:
     payload = {"raw": base64.urlsafe_b64encode(mail.as_bytes()).decode()}
     if thread_id:
         payload["threadId"] = thread_id
-    sent = client.post("/messages/send", content=json.dumps(payload),
-                       headers={"Content-Type": "application/json"}).raise_for_status().json()
-    return {"status": "ok", "message": f"E-posta {mail['To']} adresine gönderildi.", "id": sent.get("id")}
+    sent = (
+        client.post(
+            "/messages/send",
+            content=json.dumps(payload),
+            headers={"Content-Type": "application/json"},
+        )
+        .raise_for_status()
+        .json()
+    )
+    return {
+        "status": "ok",
+        "message": f"E-posta {mail['To']} adresine gönderildi.",
+        "id": sent.get("id"),
+    }
 
 
 def compose(to: str, subject: str, body: str) -> EmailMessage:
@@ -174,9 +239,17 @@ def compose(to: str, subject: str, body: str) -> EmailMessage:
 
 
 def _reply(client: httpx.Client, message_id: str, body: str) -> dict:
-    msg = client.get(f"/messages/{message_id}", params={
-        "format": "metadata", "metadataHeaders": ["From", "Reply-To", "Subject", "Message-ID", "References"],
-    }).raise_for_status().json()
+    msg = (
+        client.get(
+            f"/messages/{message_id}",
+            params={
+                "format": "metadata",
+                "metadataHeaders": ["From", "Reply-To", "Subject", "Message-ID", "References"],
+            },
+        )
+        .raise_for_status()
+        .json()
+    )
     h = _headers(msg)
     to = h.get("reply-to") or h.get("from", "")
     subject = h.get("subject", "")
@@ -209,12 +282,17 @@ async def find_email_address(args: dict, settings: Settings) -> dict:
 async def send_email(args: dict, settings: Settings) -> dict:
     to, subject, body = (args.get(k, "").strip() for k in ("to", "subject", "body"))
     if not EMAIL_RE.match(to):
-        return {"status": "error", "message": f"'{to}' geçerli bir e-posta adresi değil. Önce find_email_address kullan."}
+        return {
+            "status": "error",
+            "message": f"'{to}' geçerli bir e-posta adresi değil. Önce find_email_address kullan.",
+        }
     if not body:
         return {"status": "error", "message": "E-postanın metni boş."}
     if settings.dry_run:
         return {"status": "ok", "message": f"(deneme) E-posta {to} adresine gönderilecekti."}
-    return await asyncio.to_thread(_call, _send, settings, compose(to, subject or "(konusuz)", body), None)
+    return await asyncio.to_thread(
+        _call, _send, settings, compose(to, subject or "(konusuz)", body), None
+    )
 
 
 async def reply_email(args: dict, settings: Settings) -> dict:
@@ -224,3 +302,19 @@ async def reply_email(args: dict, settings: Settings) -> dict:
     if settings.dry_run:
         return {"status": "ok", "message": "(deneme) Yanıt gönderilecekti."}
     return await asyncio.to_thread(_call, _reply, settings, message_id, body)
+
+
+def _fetch(client: httpx.Client, query: str, limit: int) -> dict:
+    found = (
+        client.get("/messages", params={"q": query, "maxResults": limit}).raise_for_status().json()
+    )
+    messages = []
+    for ref in found.get("messages", []):
+        mail = _read(client, ref["id"])
+        messages.append({k: mail[k] for k in ("id", "from", "subject", "date", "body")})
+    return {"status": "ok", "untrusted_content": True, "messages": messages}
+
+
+async def fetch_messages(settings: Settings, query: str, limit: int) -> dict:
+    """Full text of the messages matching `query`, for the memory index."""
+    return await asyncio.to_thread(_call, _fetch, settings, query, max(1, min(50, limit)))

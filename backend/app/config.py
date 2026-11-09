@@ -15,7 +15,10 @@ ENV_FILE = BACKEND_DIR / ".env"
 def _default_claude_path() -> str:
     # The npm shim (claude.cmd) goes through cmd.exe, which would re-parse the
     # task text; the bundled claude.exe takes argv as-is.
-    exe = Path(os.environ.get("APPDATA", "")) / "npm/node_modules/@anthropic-ai/claude-code/bin/claude.exe"
+    exe = (
+        Path(os.environ.get("APPDATA", ""))
+        / "npm/node_modules/@anthropic-ai/claude-code/bin/claude.exe"
+    )
     return str(exe) if exe.exists() else "claude"
 
 
@@ -55,6 +58,22 @@ class Settings(BaseSettings):
 
     data_dir: Path = BACKEND_DIR / "data"
 
+    # Long-term memory (app/memory): notes said by voice, documents from this
+    # folder (pdf/md/txt) and, on request, recent Gmail messages.
+    memory_docs_dir: Path = ROOT_DIR / "notes"
+    embedding_model: str = "gemini-embedding-001"
+    embedding_dim: int = 768
+    # Text model of the specialist agents (app/agents). Lite: a spoken turn waits
+    # for it (~1 s per call against ~3 s for gemini-3.5-flash, Nov 2026).
+    agent_model: str = "gemini-3.5-flash-lite"
+    # LLM-as-judge in evals/run_eval.py; a different model than the agent's, so
+    # it does not grade its own answers. gemini-3.5-flash would be the stronger
+    # judge, but its free tier allows 20 requests a day (Nov 2026).
+    judge_model: str = "gemini-3.1-flash-lite"
+    memory_top_k: int = 5
+    chunk_size: int = 400
+    chunk_overlap: int = 80
+
     # OAuth client of type "Desktop app" from Google Cloud Console; see README.
     gmail_client_file: Path = BACKEND_DIR / "gmail-client.json"
 
@@ -68,6 +87,10 @@ class Settings(BaseSettings):
     @property
     def audit_log(self) -> Path:
         return self.data_dir / "audit.jsonl"
+
+    @property
+    def memory_db(self) -> Path:
+        return self.data_dir / "memory.sqlite"
 
     @property
     def gmail_token_file(self) -> Path:

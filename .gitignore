@@ -15,6 +15,13 @@ claude-workspace/
 programs/*
 !programs/README.md
 
+# Documents Mario remembers (personal); the folder's README stays
+notes/*
+!notes/README.md
+
+# Eval run outputs (the baseline is committed)
+backend/evals/results/
+
 # Skills Mario learned on this PC (personal); the folder's README stays
 skills/*
 !skills/README.md

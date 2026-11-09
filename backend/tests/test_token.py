@@ -1,8 +1,7 @@
-from google.genai import types
-
 from app.config import Settings
 from app.gemini import GeminiService
 from app.tools import TOOLS
+from google.genai import types
 
 
 def test_returns_token(client, fake_gemini):
@@ -70,8 +69,21 @@ def test_google_search_is_opt_in():
 
 def test_destructive_tools_are_the_ones_that_confirm():
     assert {n for n, t in TOOLS.items() if t.confirm or t.confirm_ctx} == {
-        "shutdown_computer", "sleep_computer", "close_program", "set_radio", "set_microphone",
-        "send_email", "reply_email", "delegate_to_claude", "learn_skill", "run_skill", "forget_skill",
+        "shutdown_computer",
+        "sleep_computer",
+        "close_program",
+        "set_radio",
+        "set_microphone",
+        "send_email",
+        "reply_email",
+        "delegate_to_claude",
+        "learn_skill",
+        "run_skill",
+        "forget_skill",
+        "click_element",
+        "press_keys",
+        "screen_task",
+        "forget_memory",
     }
 
 

@@ -1,0 +1,40 @@
+{"id": "q01", "question": "Kirayı her ay en geç ne zaman ödemem gerekiyor?", "sources": ["kira-sozlesmesi.md"], "reference": "Her ayın 5'ine kadar, havale ile."}
+{"id": "q02", "question": "Şu anki evimin aylık kirası ne kadar?", "sources": ["kira-sozlesmesi.md"], "reference": "32.500 TL."}
+{"id": "q03", "question": "Evin depozitosu ne kadardı?", "sources": ["kira-sozlesmesi.md"], "reference": "65.000 TL (iki aylık kira)."}
+{"id": "q04", "question": "Kombi bozulursa tamir masrafını kim karşılıyor?", "sources": ["kira-sozlesmesi.md"], "reference": "Ev sahibi; kombi bakımı ve büyük arızalar ev sahibine ait."}
+{"id": "q05", "question": "Evden çıkmak istersem kaç ay önceden haber vermeliyim?", "sources": ["kira-sozlesmesi.md"], "reference": "En az iki ay önceden yazılı bildirim."}
+{"id": "q06", "question": "Arabamın bir sonraki bakımı ne zaman?", "sources": ["araba-bakim.md"], "reference": "97.400 km'de ya da Haziran 2027'de, hangisi önce gelirse."}
+{"id": "q07", "question": "Son bakımda arabaya hangi motor yağı konuldu?", "sources": ["araba-bakim.md"], "reference": "0W-20."}
+{"id": "q08", "question": "Kış lastiklerim nerede duruyor?", "sources": ["araba-bakim.md"], "reference": "Kartal'daki Lastikçi Kemal'in deposunda."}
+{"id": "q09", "question": "Kasko poliçem ne zaman bitiyor?", "sources": ["araba-bakim.md"], "reference": "3 Mart 2027 (Anka Sigorta)."}
+{"id": "q10", "question": "Wi-Fi şifresini nerede bulabilirim?", "sources": ["ev-interneti.txt"], "reference": "Modemin altındaki etikette ve buzdolabının üzerindeki kartta."}
+{"id": "q11", "question": "İnternet faturası ne kadar ve ne zaman ödeniyor?", "sources": ["ev-interneti.txt"], "reference": "649 TL, her ayın 20'sinde kredi kartından otomatik."}
+{"id": "q12", "question": "İnternet kesilirse müşteri hizmetlerine hangi abone numarasını söylemeliyim?", "sources": ["ev-interneti.txt"], "reference": "7781-2290."}
+{"id": "q13", "question": "İnternet taahhüdüm ne zaman bitiyor?", "sources": ["ev-interneti.txt"], "reference": "Şubat 2027."}
+{"id": "q14", "question": "Hangi ilaca alerjim var?", "sources": ["saglik.md"], "reference": "Penisilin."}
+{"id": "q15", "question": "Bir sonraki diş kontrolüm ne zaman?", "sources": ["saglik.md"], "reference": "Nisan 2027."}
+{"id": "q16", "question": "Sol gözümün numarası kaç?", "sources": ["saglik.md"], "reference": "-1.50."}
+{"id": "q17", "question": "Hangi günler spora gidiyorum?", "sources": ["saglik.md"], "reference": "Pazartesi, çarşamba ve cuma akşamları."}
+{"id": "q18", "question": "Kuzey Lojistik projesinin teslim tarihi ne?", "sources": ["kuzey-lojistik-projesi.md"], "reference": "15 Ocak 2027."}
+{"id": "q19", "question": "Lojistik projesinin bütçesi ne kadar ve nasıl ödenecek?", "sources": ["kuzey-lojistik-projesi.md"], "reference": "180.000 TL + KDV; %40'ı başlangıçta, kalanı teslimde."}
+{"id": "q20", "question": "Kuzey Lojistik ile haftalık toplantı ne zaman?", "sources": ["kuzey-lojistik-projesi.md"], "reference": "Her perşembe 14:00, Teams üzerinden."}
+{"id": "q21", "question": "Sevkiyat panelinde giriş nasıl yapılacak?", "sources": ["kuzey-lojistik-projesi.md"], "reference": "Müşterinin Microsoft hesabıyla (Entra ID)."}
+{"id": "q22", "question": "Kapadokya'da hangi otelde kalıyoruz, rezervasyon numarası ne?", "sources": ["kapadokya-tatili.md"], "reference": "Göreme'de Taş Konak, rezervasyon TK-48213."}
+{"id": "q23", "question": "Balon turu için otelden saat kaçta alınacağız?", "sources": ["kapadokya-tatili.md"], "reference": "13 Aralık sabahı 05:30."}
+{"id": "q24", "question": "Kapadokya dönüş uçağı saat kaçta kalkıyor?", "sources": ["kapadokya-tatili.md"], "reference": "15 Aralık 19:40, Pegasus PC2733."}
+{"id": "q25", "question": "Derin Çalışma kitabından sonra hangi kitabı okuyacağım?", "sources": ["kitap-notlari.txt"], "reference": "Yavaş Üretkenlik."}
+{"id": "q26", "question": "Sabah derin çalışma bloğum hangi saatler arasında?", "sources": ["kitap-notlari.txt"], "reference": "09:00-10:30, 90 dakika."}
+{"id": "q27", "question": "Mercimek çorbası kaç dakika pişiyor?", "sources": ["tarifler.md"], "reference": "Kısık ateşte 25 dakika."}
+{"id": "q28", "question": "Annemin doğum günü ne zaman?", "sources": ["not-1"], "reference": "17 Mart."}
+{"id": "q29", "question": "Spor salonundaki dolabımın numarası neydi?", "sources": ["not-2"], "reference": "112."}
+{"id": "q30", "question": "Ahmet'e ne kadar borcum var?", "sources": ["not-3"], "reference": "1.500 TL."}
+{"id": "q31", "question": "Pamuk'un aşısı ne zaman ve nerede?", "sources": ["not-4"], "reference": "20 Aralık 2026, Moda Veteriner Kliniği."}
+{"id": "q32", "question": "Kardeşimin doğum günü ne zaman?", "sources": [], "reference": "Hafızada yok; bilmediğini söylemeli."}
+{"id": "q33", "question": "Arabamın lastik ebadı ne?", "sources": [], "reference": "Hafızada yok; bilmediğini söylemeli."}
+{"id": "q34", "question": "Netflix şifrem ne?", "sources": [], "reference": "Hafızada yok; bilmediğini söylemeli."}
+{"id": "q35", "question": "Kapadokya'da akşam yemeğini hangi restoranda yiyeceğiz?", "sources": [], "reference": "Hafızada yok; bilmediğini söylemeli."}
+{"id": "q36", "question": "Buzdolabının garantisi ne zamana kadar?", "sources": ["garanti-belgeleri.md"], "reference": "Eylül 2029'a kadar (3 yıl)."}
+{"id": "q37", "question": "Kahve makinesinin kirecini ne sıklıkla çözmeliyim?", "sources": ["garanti-belgeleri.md"], "reference": "Her 250 fincanda bir; makine uyarı ışığı yakıyor."}
+{"id": "q38", "question": "Babamın arabasının trafik sigortası ne zaman bitiyor?", "sources": ["babamin-arabasi.md"], "reference": "10 Ocak 2027."}
+{"id": "q39", "question": "Muhasebeciye belgeleri her ay ne zamana kadar göndermeliyim?", "sources": ["is-notlari.md"], "reference": "Her ayın 15'ine kadar (Zeynep Kaya)."}
+{"id": "q40", "question": "Eski evden çıkarken depozitodan ne kadar kesildi?", "sources": ["eski-ev-kira-2024.md"], "reference": "4.000 TL boya masrafı; kalan 32.000 TL iade edildi."}

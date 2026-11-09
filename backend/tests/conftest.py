@@ -1,7 +1,4 @@
 import pytest
-from fastapi.testclient import TestClient
-from google.genai import types
-
 from app.config import Settings, get_settings
 from app.confirm import PendingActions
 from app.deps import get_context, get_gemini, get_pending
@@ -9,6 +6,8 @@ from app.main import app
 from app.routers import token, tools
 from app.tools import Context
 from app.tools.claude import ClaudeJobs
+from fastapi.testclient import TestClient
+from google.genai import types
 
 LOCAL = ("127.0.0.1", 50000)
 
@@ -35,6 +34,7 @@ def settings(tmp_path):
         claude_workdir=tmp_path / "claude",
         claude_path="claude-not-installed",
         skills_dir=tmp_path / "skills",
+        memory_docs_dir=tmp_path / "notes",
     )
 
 
@@ -53,8 +53,13 @@ def project_untouched():
 
 @pytest.fixture
 def ctx(settings):
-    jobs = ClaudeJobs(settings.claude_path, settings.claude_workdir, 1, settings.audit_log,
-                      skills_dir=settings.skills_dir)
+    jobs = ClaudeJobs(
+        settings.claude_path,
+        settings.claude_workdir,
+        1,
+        settings.audit_log,
+        skills_dir=settings.skills_dir,
+    )
     return Context(settings=settings, jobs=jobs)
 
 

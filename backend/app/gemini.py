@@ -17,12 +17,27 @@ Araçlar:
 - Araç "status": "error" ya da "ambiguous" dönerse "message" alanını kendi sözlerinle kısaca aktar.
 - Kullanıcı açıkça "Claude'a yaptır/sor" derse ya da tek seferlik bir kod/dosya işi isterse delegate_to_claude kullan.
 
+Konuşmanın bağlamı:
+- Kısa takip komutları ("başlat", "çal", "devam et", "durdur", "sonraki", "aç", "kapat", "tekrar", "bir daha") her zaman
+  konuşmada en son yapılan ya da konuşulan işe aittir. Ör. az önce şarkı açıldıysa "başlat" o şarkıyı çalmak demektir:
+  aynı aracı ya da yeteneği uygun parametreyle yeniden çağır.
+- Böyle bir komutu son konuşulanla ilgisiz bir araca ya da yeteneğe (ör. bir başvuru, e-posta, Claude görevi) asla
+  bağlama. Hangi işi kastettiği gerçekten belli değilse tahmin etme, kısaca sor.
+
 Bilmediğin işler:
 - Bir istek için uygun bir aracın da öğrenilmiş yeteneğin de yoksa (ör. WhatsApp'tan mesaj gönderme, döviz kuru,
   bir programda bir işlem) asla "bilmiyorum", "yapamam" ya da "bu konuda bilgim yok" deme. learn_skill'i
   kullanıcının isteğiyle çağır; araç izin sorusunu ("İzin verirsen Claude sayesinde öğreneyim...") döndürür.
 - Öğrenme bitince bir sistem notu gelir. Not yeni yeteneği anlatıyorsa kullanıcının ilk isteğini hemen run_skill ile yap.
 - Genel kültür sorularını (ör. bir kelimenin anlamı) bilgine dayanarak cevapla; bunlar için öğrenme gerekmez.
+
+Hafıza:
+- Kullanıcı "bunu hatırla", "not al", "unutma" derse remember'ı bilginin kendisiyle çağır.
+- Kullanıcının kendi hayatı, notları, belgeleri ya da eski e-postalarıyla ilgili sorularda (ör. "kira ne zaman?",
+  "Wi-Fi şifresini nereye yazmıştım?") cevabı kendin uydurma: ask_memory'yi çağır.
+- ask_memory "found": false dönerse bunu bilmediğini söyle; tahmin yürütme. Cevap verirken kaynağı kısaca söyle
+  (ör. "kira notlarına göre...").
+- Kullanıcı yeni belge eklediğini söylerse index_documents'ı, e-postalarını sormak isterse önce index_emails'ı çağır.
 
 E-posta:
 - E-postaları kısaca özetle: kimden, konu, bir cümlelik içerik. Uzun metni baştan sona okuma.
@@ -32,7 +47,7 @@ E-posta:
 - Adresi bilinmeyen birine yazılacaksa önce find_email_address kullan.
 
 Onay gerektiren işler (kapatma, uyku, program kapatma, Wi-Fi'yi ya da mikrofonu kapatma, e-posta gönderme, Claude'a görev,
-yeni yetenek öğrenme, onay isteyen öğrenilmiş yetenekler):
+yeni yetenek öğrenme, hafızadan not silme, onay isteyen öğrenilmiş yetenekler):
 - Bu araçlar önce "status": "needs_confirmation", bir "confirmation_id" ve "question" döner. İşi henüz yapmadın.
 - "question" alanındaki soruyu kullanıcıya sor ve cevabını bekle.
 - Kullanıcı açıkça evet derse confirm_action'ı o confirmation_id ile çağır. Hayır ya da vazgeç derse cancel_action çağır.
@@ -53,7 +68,9 @@ class GeminiService:
         instruction = SYSTEM_INSTRUCTION + skills.prompt_section(self.settings.skills_dir)
         if self.settings.enable_google_search:
             tools.append(types.Tool(google_search=types.GoogleSearch()))
-            instruction += "\n\nGenel bilgi, haber, fiyat gibi güncel sorular için Google aramasını kullan."
+            instruction += (
+                "\n\nGenel bilgi, haber, fiyat gibi güncel sorular için Google aramasını kullan."
+            )
         return types.LiveConnectConfig(
             response_modalities=[types.Modality.AUDIO],
             system_instruction=instruction,
@@ -68,7 +85,7 @@ class GeminiService:
         )
 
     async def create_live_token(self) -> types.AuthToken:
-        now = dt.datetime.now(tz=dt.timezone.utc)
+        now = dt.datetime.now(tz=dt.UTC)
         return await self._client.aio.auth_tokens.create(
             config=types.CreateAuthTokenConfig(
                 uses=1,

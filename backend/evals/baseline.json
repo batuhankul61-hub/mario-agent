@@ -1,0 +1,26 @@
+{
+  "time": "2026-11-09T19:48:41",
+  "config": {
+    "embedding_model": "gemini-embedding-001",
+    "embedding_dim": 768,
+    "chunk_size": 400,
+    "chunk_overlap": 80,
+    "k": 5,
+    "agent_model": "gemini-3.5-flash-lite",
+    "judge_model": "gemini-3.1-flash-lite"
+  },
+  "summary": {
+    "questions": 40,
+    "errors": 0,
+    "hit@1": 0.917,
+    "hit@3": 1.0,
+    "hit@5": 1.0,
+    "mrr": 0.958,
+    "answer_accuracy": 0.972,
+    "mean_correctness": 4.861,
+    "faithfulness": 1.0,
+    "citation_precision": 0.973,
+    "abstention_accuracy": 1.0,
+    "dropped_citations": 0
+  }
+}

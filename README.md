@@ -51,6 +51,18 @@ Mario, Windows bilgisayarında çalışan, Jarvis tarzı bir sesli ajandır. Tar
 | `list_skills` | "Neler öğrendin?" | Öğrenilmiş yetenekleri sayar |
 | `forget_skill` 🔒 | "Döviz yeteneğini unut" | Klasörü `skills/_unutulan/` altına taşır, silmez |
 
+**Hafıza (RAG)**
+
+| Komut | Örnek | Ne yapar |
+|---|---|---|
+| `remember` | "Bunu hatırla: annemin doğum günü 17 Mart" | Notu uzun süreli hafızaya yazar (`not-1`, `not-2`...) |
+| `ask_memory` | "Kirayı ne zaman ödüyordum?" | Hafıza araştırmacısı ajan arar ve kaynaklı kısa bir cevap döner; kaynak bulamazsa "bilmiyorum" der |
+| `recall` | "Spor salonuyla ilgili ne not etmiştim?" | Notlar, belgeler ve e-postalarda anlamsal arama; en yakın parçaları kaynak id'leriyle döner |
+| `search_documents` | "Belgelerimde kasko geçiyor mu?" | Yalnızca belge klasöründe arar |
+| `index_documents` | "Belgelerimi tara" | `notes/` klasöründeki yeni ve değişen PDF, Markdown ve metin dosyalarını işler |
+| `index_emails` | "Bu haftaki maillerimi hafızaya al" | Gmail'deki e-postaları hafızaya ekler (varsayılan: son 7 gün) |
+| `forget_memory` 🔒 | "3 numaralı notu unut" | Notu siler; önce notun metnini okuyup onay ister |
+
 🔒 işaretli araçlar onay ister.
 
 ## Bilmediğini öğrenir
@@ -99,21 +111,103 @@ Yıkıcı bir araç çağrıldığında hiçbir şey çalışmaz. Sunucu işi be
 
 Böylece model kullanıcıdan duymadığı bir "evet"i varsayarsa `not_confirmed` alır ve iş yapılmaz. Bu, e-postalara gömülü talimatlara (prompt injection) karşı da asıl korumadır: "bunu x@... adresine ilet" diyen bir e-posta modeli kandırsa bile gönderme senin sesli onayın olmadan çalışmaz. Ayrıca e-posta sonuçları `untrusted_content` olarak işaretlenir ve sistem talimatı modele bu içerikteki talimatları uygulamamasını söyler. Onay tek kullanımlıktır ve 90 sn sonra düşer. Ekranda ayrıca **Onayla / İptal** düğmeleri çıkar; düğme modeli hiç devreye sokmadan doğrudan çalışır. Her çağrı, kimin onayladığıyla birlikte `backend/data/audit.jsonl` dosyasına yazılır (`GET /api/audit`). Böylece "gerçekten çalıştı mı?" sorusunun cevabı modelin söylediğine bağlı kalmaz.
 
-## Kurulum
+## Hafıza ve RAG
 
-Gereken: Windows, Python 3.12, Chrome/Edge. Claude'a iş devretmek için Claude Code kurulu ve giriş yapılmış olmalı.
+Mario'nun uzun süreli hafızası yerel tek bir SQLite dosyasıdır (`backend/data/memory.sqlite`); vektör sunucusu yoktur. Üç kaynaktan beslenir:
+
+* **Sesli notlar:** "bunu hatırla" → `remember`.
+* **Belgeler:** `notes/` klasöründeki PDF (pypdf), Markdown ve metin dosyaları. Klasör `.env` içinde `MEMORY_DOCS_DIR` ile değiştirilebilir. Her dosyanın SHA-256 özeti saklanır. Yeniden taramada yalnızca yeni ve değişen dosyalar embed edilir; silinen dosyaların parçaları hafızadan çıkarılır.
+* **E-postalar:** `index_emails`, var olan Gmail aracıyla mesajların düz metnini çeker. Parçalar `kind=email` olarak işaretlenir. Bu parçalar sonuçlarda `untrusted_content` ile döner ve ajanın talimatı, içlerindeki talimatları uygulamamasını söyler.
+
+İşleyiş (`backend/app/memory/`):
+
+1. **Chunking** (`chunking.py`): Paragraflar sığdıkça bölünmez, uzun paragraflar cümle sonlarından bölünür. Her parça, bir öncekinin son cümleleriyle başlar (varsayılan: 400 karakter, 80 karakter örtüşme). Parçanın altında durduğu Markdown başlıkları parçayla birlikte embed edilir (ör. `Belge: kira.md / Ödeme`).
+2. **Embedding** (`embeddings.py`): `gemini-embedding-001`, 768 boyut. Belgeler `RETRIEVAL_DOCUMENT`, sorular `RETRIEVAL_QUERY` görev tipiyle embed edilir (asimetrik). 3072'den küçük boyutlarda vektörler birim uzunlukta gelmediği için normalize edilir.
+3. **Vector search** (`store.py`): Vektörler SQLite'ta float32 blob olarak durur. Arama, bellekteki numpy matrisi üzerinde tam (brute-force) kosinüs benzerliğidir. Kişisel bir hafıza birkaç bin parçadan oluşur; bu ölçekte tam tarama bir milisaniyenin altında sürer ve ANN indeksine gerek kalmaz. Sonuç top-k parçadır; isteğe bağlı tür filtresi (`note`/`document`/`email`) vardır.
+4. **Kaynak gösterme ve grounding** (`citations.py`): Her parçanın bir atıf id'si vardır: `kira.md#2`, `not-7`, `mail-<id>#0`. Araştırmacı ajan cevaptaki her bilgiyi `[id]` ile gösterir. Aracın gerçekten döndürdüğü id'leri sunucu kendisi kaydeder ve bu kümede olmayan atıfları siler. Geçerli atıfı kalmayan bir cevap bilgi olarak iletilmez: `found: false` döner ve Mario "bilmiyorum" der. Fikir Lucia'daki transkript kontrolüyle aynıdır: modelin "gördüm" dediğine değil, sunucunun gördüğüne güvenilir.
+
+Sınır: `recall` ve `search_documents` ham parçaları Live modele verir. Modelin bu parçalarla sesli kurduğu cümle sunucuda süzülemez, çünkü ses doğrudan tarayıcıya gider. Kaynak denetimi bu yüzden metin üreten `ask_memory` yolundadır; sistem talimatı da kişisel sorular için bu aracı ister.
+
+## Çoklu ajan: hub-and-spoke
+
+```mermaid
+flowchart LR
+    U(("Kullanıcı<br/>ses / yazı")) <--> L["Hub: Gemini Live<br/>gemini-3.8-live<br/>yönlendirici"]
+    L -- "toolCall → POST /api/tool" --> R{{"Araç kaydı<br/>+ onay guardrail'i<br/>+ audit.jsonl"}}
+    R --> MR["Spoke: hafıza araştırmacısı<br/>Google ADK LlmAgent<br/>gemini-3.5-flash-lite"]
+    MR -- "search_memory<br/>(tek, salt okunur araç)" --> M[("Hafıza<br/>SQLite + numpy<br/>gemini-embedding-001")]
+    R --> MT["Spoke: hafıza araçları<br/>remember / recall / index"] --> M
+    R --> PC["Spoke: PC<br/>ayarlar, programlar, ekran"]
+    R --> G["Spoke: Gmail<br/>okuma; gönderme 🔒"]
+    R --> C["Spoke: Claude Code<br/>kod, ekran görevi, öğrenme 🔒"]
+    G -. "index_emails" .-> M
+    D["notes/<br/>PDF, md, txt"] -. "index_documents" .-> M
+```
+
+* **Hub:** Gemini Live sesli modeli. Kullanıcıyla konuşur ve her isteği tek bir araca yönlendirir; kendisi hiçbir şey çalıştırmaz. Araç listesi ephemeral token'a kilitlidir.
+* **Spoke'lar:** Her uzman bir aracın arkasındadır; böylece hepsi aynı onay akışından ve audit kaydından geçer. Yıkıcı ya da dışarıya giden işler (e-posta gönderme, Claude'a görev verme, not silme...) sesli "evet" olmadan çalışmaz.
+* **Hafıza araştırmacısı** (`backend/app/agents/researcher.py`) bir **Google ADK** `LlmAgent`'ıdır. Tek bir `FunctionTool`'u vardır (`search_memory`) ve her soruda `InMemoryRunner` ile yeni bir oturumda çalışır. İlk arama yetmezse soruyu farklı kelimelerle yeniden arar. Guardrail'ler modelin elinde değildir:
+  * `before_tool_callback`, izin listesinde olmayan araç adlarını reddeder ve aramayı 3 çağrıyla sınırlar;
+  * ajanın veri yazan hiçbir aracı yoktur;
+  * atıflar yukarıdaki grounding kontrolünden geçer.
+
+**Neden ADK ve neden yalnızca spoke katmanında:** Uzman ajan için ADK temiz oturdu. Araç tanımı Python fonksiyonundan çıkıyor, callback'ler guardrail için doğal bir yer ve çalıştırıcı test edilebilir: testler ADK'nın gerçek `Runner`'ını, `BaseLlm`'den türetilmiş sahte bir modelle ağa çıkmadan çalıştırır. Hub ise ADK'ya taşınmadı. Mario'da tarayıcı Gemini Live'a ephemeral token ile doğrudan bağlanır; ses sunucudan geçmez ve API anahtarı tarayıcıya gitmez. Hub'ı ADK'nın canlı akışına taşımak bütün sesi sunucudan geçirmek demekti ve karşılığında bir kazanç yoktu.
+
+## Değerlendirme (eval)
+
+`backend/evals/` altında küçük, sabit bir korpus var: 12 kurgusal kişisel belge (kira, araba, sağlık, iş projesi, tatil...) ve 4 not. Benzer konulu çeldirici belgeler (eski evin kira sözleşmesi, babanın arabası) bilerek eklendi. Soru seti `questions.jsonl` 40 sorudan oluşur: 36'sının cevabı hafızada var, 4'ününki yok (bu sorularda model uydurmak yerine "bilmiyorum" demeli).
 
 ```powershell
 cd backend
-python -m venv .venv
-.venv\Scripts\pip install -r requirements-dev.txt
-copy .env.example .env      # GEMINI_API_KEY'i doldur
-.venv\Scripts\python -m uvicorn app.main:app --host 127.0.0.1 --port 8100
+uv run python evals/run_eval.py --retrieval-only   # yalnızca embedding, ~10 sn
+uv run python evals/run_eval.py                    # ajan + LLM-as-judge; ücretsiz katmanda ~10 dk
+uv run python evals/run_eval.py --save-baseline    # bu koşuyu yeni baseline yap
 ```
+
+Ölçülenler:
+
+* **Retrieval:** hit@1, hit@3, hit@k ve MRR, yani beklenen kaynaktan bir parçanın ilk k sonuç içinde olup olmadığı.
+* **Cevap kalitesi (LLM-as-judge):** Ajanın cevabını farklı bir model (`JUDGE_MODEL`, varsayılan `gemini-3.1-flash-lite`; `gemini-3.5-flash` daha güçlü bir hakem olurdu ama ücretsiz katmanda günde 20 istekle sınırlı) referans cevapla karşılaştırır ve yapılandırılmış JSON döner: `correctness` (1-5) ve `faithful` (cevap, atıf yapılan parçalarda geçiyor mu). Hakem kendi cevabını puanlamasın diye ajanla aynı model değildir.
+* **answer_accuracy** (puanı ≥4 olanların oranı), **faithfulness**, **citation_precision** (atıfların beklenen kaynağa düşme oranı), **abstention_accuracy** (cevapsız sorularda "bilmiyorum" deme oranı), **dropped_citations** (grounding kontrolünün sildiği uydurma atıf sayısı).
+* **Regresyon:** Sonuçlar `evals/results/latest.json` ve `latest.md` dosyalarına yazılır. Bir oran `evals/baseline.json`'dakinden `--tolerance` (varsayılan 0.05) kadardan fazla düşerse betik 1 koduyla çıkar.
+
+**Son koşu** (2026-11-09; ajan `gemini-3.5-flash-lite`, hakem `gemini-3.1-flash-lite`, chunk 400/80, k=5; `evals/baseline.json`):
+
+| Metrik | Değer |
+|---|---|
+| hit@1 / hit@3 / hit@5 | 0.917 / 1.0 / 1.0 |
+| MRR | 0.958 |
+| answer_accuracy (judge ≥ 4) | 0.972 (36 sorudan 35) |
+| mean_correctness (1-5) | 4.861 |
+| faithfulness | 1.0 |
+| citation_precision | 0.973 |
+| abstention_accuracy | 1.0 (4/4 cevapsız soruda "bilmiyorum") |
+| dropped_citations | 0 |
+
+Chunk boyutu karşılaştırması (yalnızca retrieval, aynı soru seti, şu anki chunker): 800/150 → hit@1 0.917, MRR 0.958 (16 parça); 400/80 → hit@1 0.917, MRR 0.958 (33 parça); 250/50 → hit@1 0.882, MRR 0.941 (46 parça). Başlıklar parçaya eklenmeden önceki ilk denemede 400/80 öndeydi (hit@1 0.944'e karşı 0.917). Varsayılan 400/80 kaldı, çünkü sesli cevapta daha kısa parçalar ajana daha az gürültü taşıyor.
+
+Dürüst not: Korpus küçük ve sentetik (12 belge, 33 belge parçası + 4 not), bu yüzden sayılar yüksek. Asıl değeri regresyon koruması: chunking, prompt ya da model değişince düşüşü yakalar. Tek hata (q21, "giriş nasıl yapılacak?" → Entra ID) ajanın kelime eşleşmesi zayıf bir soruda "bulunamadı" demesi: uydurma değil, kaçırılmış bir cevap.
+
+## Kurulum
+
+Gereken: Windows, [uv](https://docs.astral.sh/uv/) (Python 3.12'yi kendisi kurar), Chrome/Edge. Claude'a iş devretmek için Claude Code kurulu ve giriş yapılmış olmalı.
+
+```powershell
+cd backend
+uv sync
+copy .env.example .env      # GEMINI_API_KEY'i doldur
+uv run uvicorn app.main:app --host 127.0.0.1 --port 8100
+```
+
+`uv sync` bağımlılıkları `uv.lock` dosyasından `backend\.venv` içine kurar. `Mario.vbs` ve başlangıç kısayolu bu venv'deki `pythonw`'yi kullanır.
 
 http://localhost:8100 adresini aç, **Başlat**'a bas ve konuş. Mikrofon yoksa komutları yazarak da verebilirsin.
 
 ### Tek tıkla ve Windows açılınca
+
+Proje klasöründeki **`Mario.vbs`** dosyasına çift tıkla: sunucu kapalıysa pencere açmadan başlar, Mario Chrome'da açılır. Kurulum gerekmez.
+
+Masaüstü kısayolu ve Windows açılınca başlatma için (yalnızca masaüstü kısayolu istiyorsan sona `-NoStartup` ekle):
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File backend\scripts\install-shortcuts.ps1
@@ -131,7 +225,7 @@ Kendi programlarının kısayollarını `programs/` klasörüne koy ya da `.env`
 1. [Google Cloud Console](https://console.cloud.google.com/)'da bir proje aç ve **Gmail API**'yi etkinleştir.
 2. *OAuth consent screen*: tür **External**, kendini *Test users* listesine ekle.
 3. *Credentials → Create credentials → OAuth client ID*: tür **Desktop app**. JSON dosyasını indir ve `backend/gmail-client.json` olarak kaydet (git'e girmez).
-4. `cd backend` ve `.venv\Scripts\python scripts\gmail_login.py`. Tarayıcı açılır, hesabını seçersin. İzinler yalnızca **okuma** ve **gönderme**: silme, arşivleme ya da etiketleme yok.
+4. `cd backend` ve `uv run python scripts/gmail_login.py`. Tarayıcı açılır, hesabını seçersin. İzinler yalnızca **okuma** ve **gönderme**: silme, arşivleme ya da etiketleme yok.
 
 Token `backend/data/gmail-token.json` dosyasında durur. Bağlantıyı kesmek için bu dosyayı sil.
 
@@ -152,16 +246,18 @@ tailscale serve --bg 8100
 
 ```powershell
 cd backend
-.venv\Scripts\python -m pytest
+uv run pytest
+uv run ruff check .
+uv run ruff format --check .
 ```
 
-Testler Windows'a ve ağa dokunmaz: `subprocess`, `os.startfile`, COM/WinRT/kayıt defteri yardımcıları, Open-Meteo, Gmail API ve Claude Code sahte nesnelerle değiştirilir. Kapsanan konular: onay akışı (model kendi başına onaylayamaz, onay tek kullanımlıktır, süresi dolar, düğmeyle onay), erişim kodu ve Tailscale başlıkları, token'a kilitlenen araç listesi, program bulma, ekran görüntüsü çıktısını okuma, kapatma, hava durumu, Claude işleri (görev metni argv yerine stdin'den gider, zaman aşımı, giriş yapılmamış hesap), ses/parlaklık/tema/güç planı mantığı, sistem süreçlerinin korunması, Wi‑Fi kapatmanın onayı, Gmail okuma, adres bulma, yanıtın aynı diziye gitmesi ve e-postanın ancak sesli "evet"le gönderilmesi.
+Testler Windows'a ve ağa dokunmaz. Hafıza testleri, kelimeleri hash'leyen sahte bir embedder ve senaryolu sahte bir ADK modeli kullanır. Hafıza tarafında kapsanan konular: chunking (boyut, örtüşme, başlıklar), vektör aramanın sıralaması ve tür filtresi, yalnızca değişen dosyaların yeniden embed edilmesi, PDF okuma, uydurma atıfların silinmesi, araştırmacı ajanın arama sınırı ve araç izin listesi, araçların `/api/tool` üzerinden bağlanması, not silmenin sesli onay istemesi ve eval metrikleri. Diğer araçlarda `subprocess`, `os.startfile`, COM/WinRT/kayıt defteri yardımcıları, Open-Meteo, Gmail API ve Claude Code sahte nesnelerle değiştirilir. Kapsanan konular: onay akışı (model kendi başına onaylayamaz, onay tek kullanımlıktır, süresi dolar, düğmeyle onay), erişim kodu ve Tailscale başlıkları, token'a kilitlenen araç listesi, program bulma, ekran görüntüsü çıktısını okuma, kapatma, hava durumu, Claude işleri (görev metni argv yerine stdin'den gider, zaman aşımı, giriş yapılmamış hesap), ses/parlaklık/tema/güç planı mantığı, sistem süreçlerinin korunması, Wi‑Fi kapatmanın onayı, Gmail okuma, adres bulma, yanıtın aynı diziye gitmesi ve e-postanın ancak sesli "evet"le gönderilmesi.
 
 Tarayıcı olmadan gerçek Gemini Live ile uçtan uca deneme (araçlar **gerçekten** çalışır):
 
 ```powershell
-.venv\Scripts\python scripts\live_smoke.py "İstanbul'da hava nasıl?" "Not defterini aç."
-.venv\Scripts\python scripts\live_smoke.py "Bilgisayarı kapat" "hayır"
+uv run python scripts/live_smoke.py "İstanbul'da hava nasıl?" "Not defterini aç."
+uv run python scripts/live_smoke.py "Bilgisayarı kapat" "hayır"
 ```
 
 Yıkıcı araçları ve ayar değişikliklerini gerçekten çalıştırmadan denemek için `.env` içinde `DRY_RUN=true` yap.
@@ -181,16 +277,20 @@ backend/
     gemini.py         ephemeral token: sistem talimatı + araçlar kilitli
     tools/            araç kaydı; system (program, ekran görüntüsü, kapatma), pc (ayarlar),
                       gmail, web (hava, saat), claude (Claude Code işleri ve öğrenme),
-                      skills (öğrenilmiş yetenekleri yükleme/çalıştırma)
+                      skills (öğrenilmiş yetenekleri yükleme/çalıştırma), knowledge (hafıza araçları)
+    memory/           hafıza: chunking, Gemini embedding, SQLite vektör deposu, atıf kontrolü
+    agents/           hub-and-spoke: ADK hafıza araştırmacısı
     confirm.py        bekleyen işler + "evet" kontrolü
     audit.py          audit.jsonl
     routers/          /api/token, /api/tool, /api/confirm, /api/jobs, /api/audit, /api/screenshots
   scripts/            screenshot.ps1, live_smoke.py, gmail_login.py,
                       start-mario.ps1 + serve.py + install-shortcuts.ps1 (başlatma),
                       check_skill.py (yetenek doğrulama)
+  evals/              sabit korpus, 40 soru, run_eval.py (retrieval + LLM-as-judge), baseline.json
   tests/
 frontend/             PWA: live.js, audio/ (Lucia'dan), transcript.js, session.js, app.js
 programs/             open_program'ın önce baktığı kısayollar
+notes/                Mario'nun hatırlayacağı belgeler (kişisel, git'e girmez)
 skills/               Mario'nun öğrendiği yetenekler (kişisel, git'e girmez)
 .claude/skills/       mario-yetenek: Claude'un Mario'ya yetenek öğretirken izlediği skill
 ```

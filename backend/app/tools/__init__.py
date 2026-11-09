@@ -4,10 +4,14 @@ feeds the Gemini function declarations (locked into the Live token) and the
 
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from ..config import Settings
-from . import claude, gmail, pc, skills, system, web
+from . import claude, gmail, knowledge, pc, screen, skills, system, web
+
+if TYPE_CHECKING:
+    from ..agents import MemoryResearcher
+    from ..memory import Memory
 
 Result = dict[str, Any]
 
@@ -16,6 +20,9 @@ Result = dict[str, Any]
 class Context:
     settings: Settings
     jobs: claude.ClaudeJobs
+    # Built on first use by tools/knowledge.py; tests pass ones with fake models.
+    memory: "Memory | None" = None
+    researcher: "MemoryResearcher | None" = None
 
 
 @dataclass(frozen=True)
@@ -39,7 +46,11 @@ class Tool:
     def declaration(self) -> dict:
         decl: dict[str, Any] = {"name": self.name, "description": self.description}
         if self.properties:
-            decl["parameters"] = {"type": "OBJECT", "properties": self.properties, "required": list(self.required)}
+            decl["parameters"] = {
+                "type": "OBJECT",
+                "properties": self.properties,
+                "required": list(self.required),
+            }
         return decl
 
 
@@ -77,7 +88,11 @@ TOOLS: dict[str, Tool] = {
             "take_screenshot",
             "Ekranın ya da adı verilen bir pencerenin ekran görüntüsünü alır ve kaydeder.",
             lambda a, c: system.take_screenshot(a.get("target", ""), c.settings),
-            {"target": _str("Boş bırakılırsa tüm ekran; yoksa pencere ya da program adı, ör. 'chrome'.")},
+            {
+                "target": _str(
+                    "Boş bırakılırsa tüm ekran; yoksa pencere ya da program adı, ör. 'chrome'."
+                )
+            },
         ),
         Tool(
             "lock_computer",
@@ -91,7 +106,9 @@ TOOLS: dict[str, Tool] = {
             {"mode": _str("Kapatma mı yeniden başlatma mı.", ["shutdown", "restart"])},
             ("mode",),
             confirm=lambda a: (
-                "Bilgisayar yeniden başlatılsın mı?" if a.get("mode") == "restart" else "Bilgisayar kapatılsın mı?"
+                "Bilgisayar yeniden başlatılsın mı?"
+                if a.get("mode") == "restart"
+                else "Bilgisayar kapatılsın mı?"
             ),
         ),
         Tool(
@@ -126,6 +143,51 @@ TOOLS: dict[str, Tool] = {
             lambda a, c: c.jobs.status(a.get("job_id") or None),
             {"job_id": _str("İsteğe bağlı görev numarası.")},
         ),
+        # ---------- screen ----------
+        Tool(
+            "read_screen",
+            "Öndeki (ya da adı verilen) penceredeki düğmeleri, metin alanlarını ve bağlantıları numaralı listeler. "
+            "Ekranda bir şeye tıklamadan ya da yazmadan önce çağır.",
+            _with_settings(screen.read_screen),
+            {"window": _str("İsteğe bağlı pencere ya da program adı; boşsa en öndeki pencere.")},
+        ),
+        Tool(
+            "click_element",
+            "read_screen listesindeki bir öğeye tıklar. Gönder/sil/öde gibi düğmeler sesli onay ister.",
+            _with_settings(screen.click_element),
+            {"element": _str("Öğenin listedeki numarası ya da adı.")},
+            ("element",),
+            confirm_ctx=lambda a, c: screen.click_question(a, c.settings),
+        ),
+        Tool(
+            "type_text",
+            "Öndeki pencereye ya da listedeki bir metin alanına yazı yazar.",
+            _with_settings(screen.type_text),
+            {
+                "text": _str("Yazılacak metin."),
+                "element": _str("İsteğe bağlı: yazılacak alanın numarası ya da adı."),
+                "enter": _bool("true: yazdıktan sonra Enter'a bas."),
+            },
+            ("text",),
+        ),
+        Tool(
+            "press_keys",
+            "Öndeki pencerede tuşlara basar, ör. 'ctrl+s', 'enter', 'alt+tab', 'ctrl+l'; birkaçı boşlukla ayrılır. "
+            "Pencere kapatan kısayollar sesli onay ister.",
+            _with_settings(screen.press_keys),
+            {"keys": _str("Tuşlar."), "window": _str("İsteğe bağlı pencere adı.")},
+            ("keys",),
+            confirm=screen.keys_question,
+        ),
+        Tool(
+            "screen_task",
+            "Birkaç adım süren ya da ekranı görerek karar vermeyi gerektiren bir işi Claude'a verir; Claude ekrana "
+            "bakıp tıklayarak yapar. Sesli onay gerekir.",
+            lambda a, c: c.jobs.screen(a.get("task", "")),
+            {"task": _str("Kullanıcının isteğinden yazılmış eksiksiz Türkçe görev metni.")},
+            ("task",),
+            confirm=lambda a: f"Bu ekran görevini Claude'a vereyim mi: {a.get('task', '')}",
+        ),
         # ---------- learning ----------
         Tool(
             "learn_skill",
@@ -147,7 +209,9 @@ TOOLS: dict[str, Tool] = {
             _with_settings(skills.run_skill),
             {
                 "name": _str("Yeteneğin adı."),
-                "args_json": _str('Parametreler, JSON nesnesi olarak, ör. {"kisi": "Ahmet", "mesaj": "Geliyorum"}.'),
+                "args_json": _str(
+                    'Parametreler, JSON nesnesi olarak, ör. {"kisi": "Ahmet", "mesaj": "Geliyorum"}.'
+                ),
             },
             ("name",),
             confirm_ctx=lambda a, c: skills.skill_question(a, c.settings),
@@ -191,7 +255,8 @@ TOOLS: dict[str, Tool] = {
             ("mute",),
             confirm=lambda a: (
                 "Mikrofon kapatılsın mı? Bu bilgisayardan konuşuyorsan seni duyamam, açmak için yazman gerekir."
-                if a.get("mute", True) else None
+                if a.get("mute", True)
+                else None
             ),
         ),
         Tool(
@@ -205,7 +270,10 @@ TOOLS: dict[str, Tool] = {
             "set_brightness",
             "Ekran parlaklığını ayarlar ya da 10 puan artırır/azaltır (tüm monitörler).",
             _with_settings(pc.set_brightness),
-            {"level": _int("0-100 arası hedef seviye."), "change": _str("Artır ya da azalt.", ["up", "down"])},
+            {
+                "level": _int("0-100 arası hedef seviye."),
+                "change": _str("Artır ya da azalt.", ["up", "down"]),
+            },
         ),
         Tool(
             "set_theme",
@@ -232,11 +300,15 @@ TOOLS: dict[str, Tool] = {
             "set_radio",
             "Wi-Fi ya da Bluetooth'u açar veya kapatır. Wi-Fi'yi kapatmak sesli onay ister.",
             _with_settings(pc.set_radio),
-            {"radio": _str("Hangisi.", ["wifi", "bluetooth"]), "on": _bool("true: aç, false: kapat.")},
+            {
+                "radio": _str("Hangisi.", ["wifi", "bluetooth"]),
+                "on": _bool("true: aç, false: kapat."),
+            },
             ("radio", "on"),
             confirm=lambda a: (
                 "Wi-Fi kapatılsın mı? Telefondan bağlıysan bağlantı kopabilir."
-                if a.get("radio") == "wifi" and not a.get("on") else None
+                if a.get("radio") == "wifi" and not a.get("on")
+                else None
             ),
         ),
         Tool(
@@ -263,7 +335,9 @@ TOOLS: dict[str, Tool] = {
             _with_settings(pc.close_program),
             {"name": _str("Program ya da pencere adı.")},
             ("name",),
-            confirm=lambda a: f"{a.get('name', '')} kapatılsın mı? Kaydedilmemiş işler kaybolabilir.",
+            confirm=lambda a: (
+                f"{a.get('name', '')} kapatılsın mı? Kaydedilmemiş işler kaybolabilir."
+            ),
         ),
         # ---------- Gmail ----------
         Tool(
@@ -271,7 +345,9 @@ TOOLS: dict[str, Tool] = {
             "Gmail'de e-postaları listeler. Varsayılan: gelen kutusundaki okunmamışlar.",
             _with_settings(gmail.list_emails),
             {
-                "query": _str("Gmail arama ifadesi, ör. 'is:unread in:inbox', 'from:ahmet newer_than:2d'."),
+                "query": _str(
+                    "Gmail arama ifadesi, ör. 'is:unread in:inbox', 'from:ahmet newer_than:2d'."
+                ),
                 "max_results": _int("En fazla kaç e-posta (1-10)."),
             },
         ),
@@ -293,7 +369,11 @@ TOOLS: dict[str, Tool] = {
             "send_email",
             "Yeni bir e-posta gönderir. Sesli onay gerekir.",
             _with_settings(gmail.send_email),
-            {"to": _str("Alıcının e-posta adresi."), "subject": _str("Konu."), "body": _str("Metin.")},
+            {
+                "to": _str("Alıcının e-posta adresi."),
+                "subject": _str("Konu."),
+                "body": _str("Metin."),
+            },
             ("to", "subject", "body"),
             confirm=lambda a: (
                 f"{a.get('to', '')} adresine '{a.get('subject', '')}' konulu şu e-posta gönderilsin mi: "
@@ -307,6 +387,61 @@ TOOLS: dict[str, Tool] = {
             {"id": _str("Yanıtlanacak e-postanın id'si."), "body": _str("Yanıt metni.")},
             ("id", "body"),
             confirm=lambda a: f"Bu e-postaya şu yanıt gönderilsin mi: {_short(a.get('body', ''))}",
+        ),
+        # ---------- memory (RAG) ----------
+        Tool(
+            "remember",
+            "Kullanıcı 'bunu hatırla', 'not al', 'unutma' dediğinde bilgiyi uzun süreli hafızaya not eder.",
+            knowledge.remember,
+            {"text": _str("Hatırlanacak bilgi, tek başına anlaşılır eksiksiz bir cümle.")},
+            ("text",),
+        ),
+        Tool(
+            "ask_memory",
+            "Kullanıcının kendi notları, belgeleri ya da hafızaya alınmış e-postalarıyla ilgili bir soruyu "
+            "cevaplar (ör. 'kira ne zaman ödeniyor?', 'arabanın bakımı ne zaman?'). Hafıza araştırmacısı ajan "
+            "arar ve kaynaklı kısa bir cevap döner.",
+            knowledge.ask_memory,
+            {"question": _str("Kullanıcının sorusu, eksiksiz.")},
+            ("question",),
+        ),
+        Tool(
+            "recall",
+            "Hafızadaki notlarda, belgelerde ve e-postalarda anlamsal arama yapar, en yakın parçaları kaynak "
+            "id'leriyle döner. Hızlı bir bakış ya da 'ne not etmiştim?' için.",
+            knowledge.recall,
+            {"query": _str("Aranacak konu.")},
+            ("query",),
+        ),
+        Tool(
+            "search_documents",
+            "Yalnızca belge klasöründeki dosyalarda (PDF, Markdown, metin) anlamsal arama yapar.",
+            knowledge.search_documents,
+            {"query": _str("Aranacak konu.")},
+            ("query",),
+        ),
+        Tool(
+            "index_documents",
+            "Belge klasöründeki yeni ve değişen dosyaları hafızaya ekler, silinenleri çıkarır.",
+            knowledge.index_documents,
+        ),
+        Tool(
+            "index_emails",
+            "Gmail'deki e-postaları hafızaya ekler, sonra ask_memory ile sorulabilir. Varsayılan: son 7 günün "
+            "gelen kutusu.",
+            knowledge.index_emails,
+            {
+                "query": _str("Gmail arama ifadesi, ör. 'in:inbox newer_than:7d'."),
+                "max_results": _int("En fazla kaç e-posta (1-50)."),
+            },
+        ),
+        Tool(
+            "forget_memory",
+            "Hafızadaki bir notu siler (not-3 gibi bir id). Sesli onay gerekir.",
+            knowledge.forget_memory,
+            {"id": _str("Notun id'si, ör. 'not-3'.")},
+            ("id",),
+            confirm_ctx=knowledge.forget_question,
         ),
         Tool(
             "confirm_action",

@@ -1,0 +1,12 @@
+Ev interneti ve modem bilgileri
+
+İnternet sağlayıcısı Hızlınet, fiber 500 Mbps tarife. Aylık fatura 649 TL ve her ayın 20'sinde kredi kartından otomatik çekiliyor.
+Taahhüt Şubat 2027'de bitiyor; bitmeden iptal edilirse cayma bedeli çıkıyor.
+
+Modem salonda, televizyon ünitesinin arkasında duruyor. Kablosuz ağın adı Mario_5G. Wi-Fi şifresi modemin altındaki etikette yazıyor,
+ayrıca buzdolabının üzerindeki kartta da var.
+
+Arıza olursa önce modemi 30 saniye kapatıp aç. Düzelmezse Hızlınet müşteri hizmetlerini ara ve abone numarasını söyle: 7781-2290.
+Teknik servis genelde ertesi gün geliyor.
+
+Mario sunucusu için modemde port yönlendirme yok; telefondan erişim Tailscale üzerinden yapılıyor.
