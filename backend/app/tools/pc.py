@@ -40,8 +40,23 @@ PLAN_ALIASES = {
 
 # Never closed by close_program: Windows itself, and Mario's own processes.
 PROTECTED = {
-    "explorer", "winlogon", "csrss", "lsass", "services", "smss", "svchost", "dwm", "wininit",
-    "fontdrvhost", "sihost", "taskhostw", "python", "pythonw", "uvicorn", "tailscaled", "tailscaleipn",
+    "explorer",
+    "winlogon",
+    "csrss",
+    "lsass",
+    "services",
+    "smss",
+    "svchost",
+    "dwm",
+    "wininit",
+    "fontdrvhost",
+    "sihost",
+    "taskhostw",
+    "python",
+    "pythonw",
+    "uvicorn",
+    "tailscaled",
+    "tailscaleipn",
 }
 
 ok = lambda message, **extra: {"status": "ok", "message": message, **extra}  # noqa: E731
@@ -50,8 +65,15 @@ err = lambda message: {"status": "error", "message": message}  # noqa: E731
 
 def _run(cmd: list[str]) -> subprocess.CompletedProcess:
     # Console tools like powercfg print in the OEM code page (cp857 for Turkish).
-    return subprocess.run(cmd, capture_output=True, text=True, encoding="oem", errors="replace", timeout=15,
-                          creationflags=NO_WINDOW)
+    return subprocess.run(
+        cmd,
+        capture_output=True,
+        text=True,
+        encoding="oem",
+        errors="replace",
+        timeout=15,
+        creationflags=NO_WINDOW,
+    )
 
 
 @contextmanager
@@ -73,7 +95,9 @@ def pick(name: str, options: dict[str, str]) -> tuple[str | None, list[str]]:
     exact = [k for k, label in options.items() if plain(label) == wanted]
     if exact:
         return exact[0], []
-    partial = [k for k, label in options.items() if wanted in plain(label) or plain(label) in wanted]
+    partial = [
+        k for k, label in options.items() if wanted in plain(label) or plain(label) in wanted
+    ]
     if len(partial) == 1:
         return partial[0], []
     return None, [options[k] for k in partial]
@@ -81,14 +105,18 @@ def pick(name: str, options: dict[str, str]) -> tuple[str | None, list[str]]:
 
 # ---------- sound ----------
 
+
 def _audio_sync() -> dict:
     from pycaw.pycaw import AudioUtilities  # noqa: PLC0415
 
     with _com():
         speakers = AudioUtilities.GetSpeakers()
         vol = speakers.EndpointVolume
-        return {"device": speakers.FriendlyName, "level": round(vol.GetMasterVolumeLevelScalar() * 100),
-                "muted": bool(vol.GetMute())}
+        return {
+            "device": speakers.FriendlyName,
+            "level": round(vol.GetMasterVolumeLevelScalar() * 100),
+            "muted": bool(vol.GetMute()),
+        }
 
 
 def _set_audio_sync(level: int | None, mute: bool | None) -> None:
@@ -108,7 +136,9 @@ def _outputs_sync() -> dict[str, str]:
 
     with _com(), warnings.catch_warnings():
         warnings.simplefilter("ignore")  # pycaw warns about unreadable optional properties
-        found = AudioUtilities.GetDeviceEnumerator().EnumAudioEndpoints(EDataFlow.eRender.value, DEVICE_STATE.ACTIVE.value)
+        found = AudioUtilities.GetDeviceEnumerator().EnumAudioEndpoints(
+            EDataFlow.eRender.value, DEVICE_STATE.ACTIVE.value
+        )
         devices = [AudioUtilities.CreateDevice(found.Item(i)) for i in range(found.GetCount())]
         return {d.id: d.FriendlyName for d in devices}
 
@@ -118,7 +148,9 @@ def _set_output_sync(device_id: str) -> None:
     from pycaw.pycaw import AudioUtilities  # noqa: PLC0415
 
     with _com():
-        AudioUtilities.SetDefaultDevice(device_id, [ERole.eConsole, ERole.eMultimedia, ERole.eCommunications])
+        AudioUtilities.SetDefaultDevice(
+            device_id, [ERole.eConsole, ERole.eMultimedia, ERole.eCommunications]
+        )
 
 
 async def set_volume(args: dict, settings: Settings) -> dict:
@@ -155,7 +187,9 @@ def _set_mic_sync(mute: bool) -> None:
     from pycaw.pycaw import AudioUtilities  # noqa: PLC0415
 
     with _com():
-        AudioUtilities.CreateDevice(AudioUtilities.GetMicrophone()).EndpointVolume.SetMute(int(mute), None)
+        AudioUtilities.CreateDevice(AudioUtilities.GetMicrophone()).EndpointVolume.SetMute(
+            int(mute), None
+        )
 
 
 async def set_microphone(args: dict, settings: Settings) -> dict:
@@ -170,8 +204,10 @@ async def set_microphone(args: dict, settings: Settings) -> dict:
         return ok(f"(deneme) Mikrofon {'kapatılacaktı' if mute else 'açılacaktı'}.")
     await asyncio.to_thread(_set_mic_sync, mute)
     if mute:
-        return ok(f"Mikrofon kapatıldı ({mic['device']}). Bu bilgisayardan konuşuyorsan seni artık duyamam; "
-                  "açmak için 'mikrofonu aç' yazabilirsin.")
+        return ok(
+            f"Mikrofon kapatıldı ({mic['device']}). Bu bilgisayardan konuşuyorsan seni artık duyamam; "
+            "açmak için 'mikrofonu aç' yazabilirsin."
+        )
     return ok(f"Mikrofon açıldı ({mic['device']}).")
 
 
@@ -188,6 +224,7 @@ async def set_audio_output(args: dict, settings: Settings) -> dict:
 
 
 # ---------- screen and appearance ----------
+
 
 def _brightness_sync() -> list[int]:
     import screen_brightness_control as sbc  # noqa: PLC0415
@@ -223,7 +260,10 @@ async def set_brightness(args: dict, settings: Settings) -> dict:
     done = await asyncio.to_thread(_set_brightness_sync, level)
     if not done:
         return err("Parlaklık değiştirilemedi; monitörde DDC/CI kapalı olabilir.")
-    return ok(f"Parlaklık yüzde {level}." + ("" if done == len(current) else f" ({done} ekranda değişti.)"))
+    return ok(
+        f"Parlaklık yüzde {level}."
+        + ("" if done == len(current) else f" ({done} ekranda değişti.)")
+    )
 
 
 PERSONALIZE = r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize"
@@ -248,7 +288,9 @@ def _write_dwords(path: str, values: dict[str, int], broadcast: str) -> None:
             winreg.SetValueEx(key, name, 0, winreg.REG_DWORD, value)
     # Tell open windows (taskbar, apps) to re-read the setting.
     result = ctypes.c_ulong()
-    ctypes.windll.user32.SendMessageTimeoutW(0xFFFF, 0x001A, 0, broadcast, 0x0002, 3000, ctypes.byref(result))
+    ctypes.windll.user32.SendMessageTimeoutW(
+        0xFFFF, 0x001A, 0, broadcast, 0x0002, 3000, ctypes.byref(result)
+    )
 
 
 def _theme_sync() -> str:
@@ -264,7 +306,10 @@ async def set_theme(args: dict, settings: Settings) -> dict:
         return ok(f"(deneme) {label} temaya geçilecekti.")
     value = int(mode == "light")
     await asyncio.to_thread(
-        _write_dwords, PERSONALIZE, {"AppsUseLightTheme": value, "SystemUsesLightTheme": value}, "ImmersiveColorSet"
+        _write_dwords,
+        PERSONALIZE,
+        {"AppsUseLightTheme": value, "SystemUsesLightTheme": value},
+        "ImmersiveColorSet",
     )
     return ok(f"{label} temaya geçildi.")
 
@@ -281,7 +326,10 @@ async def set_do_not_disturb(args: dict, settings: Settings) -> dict:
     if settings.dry_run:
         return ok(f"(deneme) Rahatsız etme {'açılacaktı' if on else 'kapatılacaktı'}.")
     await asyncio.to_thread(
-        _write_dwords, NOTIFICATIONS, {"NOC_GLOBAL_SETTING_TOASTS_ENABLED": int(not on)}, "Notifications"
+        _write_dwords,
+        NOTIFICATIONS,
+        {"NOC_GLOBAL_SETTING_TOASTS_ENABLED": int(not on)},
+        "Notifications",
     )
     return ok("Bildirimler susturuldu." if on else "Bildirimler yeniden açık.")
 
@@ -301,13 +349,18 @@ async def open_settings(args: dict, settings: Settings) -> dict:
 
 # ---------- network ----------
 
+
 def _radios_sync() -> dict[str, str]:
     from winrt.windows.devices.radios import Radio, RadioKind, RadioState  # noqa: PLC0415
 
     async def read():
         radios = await Radio.get_radios_async()
         kinds = {RadioKind.WI_FI: "wifi", RadioKind.BLUETOOTH: "bluetooth"}
-        return {kinds[r.kind]: ("on" if r.state == RadioState.ON else "off") for r in radios if r.kind in kinds}
+        return {
+            kinds[r.kind]: ("on" if r.state == RadioState.ON else "off")
+            for r in radios
+            if r.kind in kinds
+        }
 
     return asyncio.run(read())
 
@@ -353,23 +406,35 @@ def _network_sync() -> dict:
     wired = [
         {"name": name, "speed_mbps": st.speed}
         for name, st in psutil.net_if_stats().items()
-        if st.isup and st.speed and not re.search(r"loopback|vethernet|virtual|vmware|tailscale|bluetooth", name, re.I)
+        if st.isup
+        and st.speed
+        and not re.search(r"loopback|vethernet|virtual|vmware|tailscale|bluetooth", name, re.I)
     ]
-    return {"wifi": ssid.group(1).strip() if ssid else None, "signal": int(signal.group(1)) if signal and ssid else None,
-            "wired": wired}
+    return {
+        "wifi": ssid.group(1).strip() if ssid else None,
+        "signal": int(signal.group(1)) if signal and ssid else None,
+        "wired": wired,
+    }
 
 
 def describe_network(net: dict) -> str:
     parts = []
     if net["wifi"]:
-        parts.append(f"Wi-Fi: {net['wifi']}" + (f", sinyal yüzde {net['signal']}" if net["signal"] else ""))
+        parts.append(
+            f"Wi-Fi: {net['wifi']}" + (f", sinyal yüzde {net['signal']}" if net["signal"] else "")
+        )
     for w in net["wired"]:
-        speed = f"{w['speed_mbps'] // 1000} Gbit/s" if w["speed_mbps"] >= 1000 else f"{w['speed_mbps']} Mbit/s"
+        speed = (
+            f"{w['speed_mbps'] // 1000} Gbit/s"
+            if w["speed_mbps"] >= 1000
+            else f"{w['speed_mbps']} Mbit/s"
+        )
         parts.append(f"kablolu: {w['name']} ({speed})")
     return "; ".join(parts) or "Bağlı bir ağ görünmüyor."
 
 
 # ---------- power ----------
+
 
 def _plans_sync() -> tuple[dict[str, str], str | None]:
     out = _run(["powercfg", "/list"]).stdout
@@ -393,7 +458,10 @@ async def set_power_plan(args: dict, settings: Settings) -> dict:
     if not key:
         key, candidates = pick(args.get("plan", ""), plans)
     if not key:
-        return {"status": "ambiguous", "message": f"Hangi güç planı? Seçenekler: {', '.join(candidates or plans.values())}."}
+        return {
+            "status": "ambiguous",
+            "message": f"Hangi güç planı? Seçenekler: {', '.join(candidates or plans.values())}.",
+        }
     if settings.dry_run:
         return ok(f"(deneme) {plans[key]} planına geçilecekti.")
     if await asyncio.to_thread(_set_plan_sync, key) != 0:
@@ -417,6 +485,7 @@ async def sleep_computer(args: dict, settings: Settings) -> dict:
 
 # ---------- status and programs ----------
 
+
 def _system_sync() -> dict:
     import psutil  # noqa: PLC0415
 
@@ -424,23 +493,35 @@ def _system_sync() -> dict:
     return {
         "cpu": round(psutil.cpu_percent(interval=0.3)),
         "ram": round(psutil.virtual_memory().percent),
-        "battery": None if battery is None else {"percent": round(battery.percent), "plugged": battery.power_plugged},
+        "battery": None
+        if battery is None
+        else {"percent": round(battery.percent), "plugged": battery.power_plugged},
     }
 
 
 async def get_pc_status(args: dict, settings: Settings) -> dict:
     """One read-only summary, so "durum ne?" needs a single call. Each part may fail on its own."""
     parts = {
-        "audio": _audio_sync, "microphone": _mic_sync, "brightness": _brightness_sync, "theme": _theme_sync,
-        "notifications": _notifications_sync, "radios": _radios_sync, "network": _network_sync,
-        "power_plans": _plans_sync, "system": _system_sync,
+        "audio": _audio_sync,
+        "microphone": _mic_sync,
+        "brightness": _brightness_sync,
+        "theme": _theme_sync,
+        "notifications": _notifications_sync,
+        "radios": _radios_sync,
+        "network": _network_sync,
+        "power_plans": _plans_sync,
+        "system": _system_sync,
     }
-    results = await asyncio.gather(*(asyncio.to_thread(f) for f in parts.values()), return_exceptions=True)
+    results = await asyncio.gather(
+        *(asyncio.to_thread(f) for f in parts.values()), return_exceptions=True
+    )
     data = {k: (None if isinstance(v, BaseException) else v) for k, v in zip(parts, results)}
 
     said = []
     if a := data["audio"]:
-        said.append(f"Ses yüzde {a['level']}{' (kapalı)' if a['muted'] else ''}, çıkış: {a['device']}")
+        said.append(
+            f"Ses yüzde {a['level']}{' (kapalı)' if a['muted'] else ''}, çıkış: {a['device']}"
+        )
     if m := data["microphone"]:
         said.append(f"mikrofon {'kapalı' if m['muted'] else 'açık'}")
     if b := data["brightness"]:
@@ -450,7 +531,10 @@ async def get_pc_status(args: dict, settings: Settings) -> dict:
     if data["notifications"] is not None:
         said.append("bildirimler açık" if data["notifications"] else "bildirimler susturulmuş")
     if r := data["radios"]:
-        said += [f"{'Wi-Fi' if k == 'wifi' else 'Bluetooth'} {'açık' if v == 'on' else 'kapalı'}" for k, v in r.items()]
+        said += [
+            f"{'Wi-Fi' if k == 'wifi' else 'Bluetooth'} {'açık' if v == 'on' else 'kapalı'}"
+            for k, v in r.items()
+        ]
     if n := data["network"]:
         said.append(describe_network(n))
     if p := data["power_plans"]:
@@ -460,7 +544,9 @@ async def get_pc_status(args: dict, settings: Settings) -> dict:
     if s := data["system"]:
         said.append(f"işlemci yüzde {s['cpu']}, bellek yüzde {s['ram']}")
         if s["battery"]:
-            said.append(f"pil yüzde {s['battery']['percent']}{', şarjda' if s['battery']['plugged'] else ''}")
+            said.append(
+                f"pil yüzde {s['battery']['percent']}{', şarjda' if s['battery']['plugged'] else ''}"
+            )
     data["power_plans"] = data["power_plans"][0] if data["power_plans"] else None
     return ok(". ".join(capitalize(x) for x in said) + ".", **data)
 
@@ -472,8 +558,9 @@ def capitalize(text: str) -> str:
 
 def _windows_sync() -> list[dict]:
     """Visible top-level windows with a title, and the process behind each."""
-    import psutil  # noqa: PLC0415
     from ctypes import wintypes  # noqa: PLC0415
+
+    import psutil  # noqa: PLC0415
 
     user32 = ctypes.windll.user32
     found: list[dict] = []
@@ -481,7 +568,9 @@ def _windows_sync() -> list[dict]:
     @ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
     def visit(hwnd, _):
         cloaked = wintypes.DWORD()  # hidden UWP hosts such as TextInputHost are "cloaked"
-        ctypes.windll.dwmapi.DwmGetWindowAttribute(hwnd, 14, ctypes.byref(cloaked), ctypes.sizeof(cloaked))
+        ctypes.windll.dwmapi.DwmGetWindowAttribute(
+            hwnd, 14, ctypes.byref(cloaked), ctypes.sizeof(cloaked)
+        )
         if user32.IsWindowVisible(hwnd) and not cloaked.value and user32.GetWindowTextLengthW(hwnd):
             buf = ctypes.create_unicode_buffer(512)
             user32.GetWindowTextW(hwnd, buf, 512)
@@ -491,7 +580,7 @@ def _windows_sync() -> list[dict]:
                 name = psutil.Process(pid.value).name().removesuffix(".exe")
             except psutil.Error:
                 return True
-            found.append({"pid": pid.value, "process": name, "title": buf.value})
+            found.append({"pid": pid.value, "process": name, "title": buf.value, "hwnd": hwnd})
         return True
 
     user32.EnumWindows(visit, 0)
@@ -507,14 +596,23 @@ def matching_windows(name: str, windows: list[dict]) -> list[dict]:
     wanted = plain(name)
     if not wanted:
         return []
-    return [w for w in windows if plain(w["process"]) not in PROTECTED
-            and (wanted in plain(w["process"]) or wanted in plain(w["title"]))]
+    return [
+        w
+        for w in windows
+        if plain(w["process"]) not in PROTECTED
+        and (wanted in plain(w["process"]) or wanted in plain(w["title"]))
+    ]
 
 
 async def list_programs(args: dict, settings: Settings) -> dict:
-    windows = [w for w in await asyncio.to_thread(_windows_sync) if plain(w["process"]) not in PROTECTED]
+    windows = [
+        w for w in await asyncio.to_thread(_windows_sync) if plain(w["process"]) not in PROTECTED
+    ]
     names = sorted({w["process"] for w in windows}, key=str.lower)
-    return ok(f"Açık programlar: {', '.join(names)}." if names else "Açık bir program penceresi yok.", windows=windows)
+    return ok(
+        f"Açık programlar: {', '.join(names)}." if names else "Açık bir program penceresi yok.",
+        windows=windows,
+    )
 
 
 async def close_program(args: dict, settings: Settings) -> dict:

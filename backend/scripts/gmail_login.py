@@ -13,16 +13,17 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from google_auth_oauthlib.flow import InstalledAppFlow  # noqa: E402
-
 from app.config import get_settings  # noqa: E402
 from app.tools.gmail import SCOPES  # noqa: E402
+from google_auth_oauthlib.flow import InstalledAppFlow  # noqa: E402
 
 
 def main() -> None:
     settings = get_settings()
     if not settings.gmail_client_file.exists():
-        sys.exit(f"OAuth istemci dosyası yok: {settings.gmail_client_file}\nREADME'deki 'Gmail bağlama' adımlarına bak.")
+        sys.exit(
+            f"OAuth istemci dosyası yok: {settings.gmail_client_file}\nREADME'deki 'Gmail bağlama' adımlarına bak."
+        )
     flow = InstalledAppFlow.from_client_secrets_file(str(settings.gmail_client_file), SCOPES)
     creds = flow.run_local_server(port=0, prompt="consent")
     settings.data_dir.mkdir(parents=True, exist_ok=True)

@@ -1,12 +1,11 @@
 ﻿# Masaüstüne "Mario" kısayolu (sunucuyu gerekirse başlatıp Mario'yu açar) ve Başlangıç klasörüne
 # Windows açılınca sunucuyu sessizce başlatan bir kısayol koyar. -Remove: ikisini de kaldırır.
-param([switch]$Remove)
+# -NoStartup: yalnızca masaüstü kısayolu.
+param([switch]$Remove, [switch]$NoStartup)
 
 $start = Join-Path $PSScriptRoot 'start-mario.ps1'
-$links = @{
-  (Join-Path ([Environment]::GetFolderPath('Desktop')) 'Mario.lnk') = ''
-  (Join-Path ([Environment]::GetFolderPath('Startup')) 'Mario.lnk') = ' -NoBrowser'
-}
+$links = @{ (Join-Path ([Environment]::GetFolderPath('Desktop')) 'Mario.lnk') = '' }
+if (-not $NoStartup) { $links[(Join-Path ([Environment]::GetFolderPath('Startup')) 'Mario.lnk')] = ' -NoBrowser' }
 
 foreach ($path in $links.Keys) {
   if ($Remove) {

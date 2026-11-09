@@ -13,8 +13,7 @@ from ..config import get_settings
 from ..confirm import PendingActions, is_affirmative
 from ..deps import get_context, get_pending, require_access
 from ..ratelimit import RateLimiter, enforce
-from ..tools import TOOLS, Context, Result
-from ..tools import system
+from ..tools import TOOLS, Context, Result, system
 
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["tools"], dependencies=[Depends(require_access)])
@@ -39,19 +38,39 @@ async def execute(name: str, args: dict, ctx: Context, confirmed_by: str | None 
         result = await tool.run(args, ctx)  # type: ignore[misc]  # meta tools never reach here
     except Exception as exc:
         log.exception("Tool %s failed", name)
-        result = {"status": "error", "message": f"Beklenmedik bir hata oldu ({exc.__class__.__name__})."}
-    audit.record(ctx.settings.audit_log, tool=name, args=args, status=result.get("status"),
-                 message=result.get("message"), confirmed_by=confirmed_by, dry_run=ctx.settings.dry_run)
+        result = {
+            "status": "error",
+            "message": f"Beklenmedik bir hata oldu ({exc.__class__.__name__}).",
+        }
+    audit.record(
+        ctx.settings.audit_log,
+        tool=name,
+        args=args,
+        status=result.get("status"),
+        message=result.get("message"),
+        confirmed_by=confirmed_by,
+        dry_run=ctx.settings.dry_run,
+    )
     return result
 
 
-async def confirm(args: dict, utterances: list[str], ctx: Context, pending: PendingActions) -> Result:
+async def confirm(
+    args: dict, utterances: list[str], ctx: Context, pending: PendingActions
+) -> Result:
     item = pending.get(str(args.get("confirmation_id", "")))
     if item is None:
-        return {"status": "error", "message": "Bekleyen böyle bir iş yok ya da onay süresi doldu. İsteği yeniden al."}
+        return {
+            "status": "error",
+            "message": "Bekleyen böyle bir iş yok ya da onay süresi doldu. İsteği yeniden al.",
+        }
     if not is_affirmative(utterances):
-        audit.record(ctx.settings.audit_log, tool=item.tool, args=item.args, status="not_confirmed",
-                     heard=utterances)
+        audit.record(
+            ctx.settings.audit_log,
+            tool=item.tool,
+            args=item.args,
+            status="not_confirmed",
+            heard=utterances,
+        )
         return {
             "status": "not_confirmed",
             "message": "Kullanıcının sesli onayı duyulmadı; iş yapılmadı. Soruyu bir kez daha sor.",
@@ -79,13 +98,21 @@ async def run_tool(
         item = pending.pop(str(call.args.get("confirmation_id", "")))
         if item:
             audit.record(ctx.settings.audit_log, tool=item.tool, args=item.args, status="cancelled")
-        return {"status": "ok", "message": "İş iptal edildi." if item else "İptal edilecek bekleyen iş yoktu."}
+        return {
+            "status": "ok",
+            "message": "İş iptal edildi." if item else "İptal edilecek bekleyen iş yoktu.",
+        }
 
     question = tool.question(call.args, ctx)
     if question:
         item = pending.add(call.name, call.args, question)
-        audit.record(ctx.settings.audit_log, tool=call.name, args=call.args, status="needs_confirmation",
-                     confirmation_id=item.id)
+        audit.record(
+            ctx.settings.audit_log,
+            tool=call.name,
+            args=call.args,
+            status="needs_confirmation",
+            confirmation_id=item.id,
+        )
         return {
             "status": "needs_confirmation",
             "confirmation_id": item.id,
@@ -107,7 +134,9 @@ async def answer_by_button(
     if item is None:
         raise HTTPException(status_code=404, detail="Bekleyen böyle bir iş yok ya da süresi doldu.")
     if not body.approved:
-        audit.record(ctx.settings.audit_log, tool=item.tool, args=item.args, status="cancelled", by="button")
+        audit.record(
+            ctx.settings.audit_log, tool=item.tool, args=item.args, status="cancelled", by="button"
+        )
         return {"status": "ok", "message": "İş iptal edildi.", "tool": item.tool}
     result = await execute(item.tool, item.args, ctx, confirmed_by="button")
     return {**result, "tool": item.tool}

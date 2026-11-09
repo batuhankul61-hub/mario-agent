@@ -53,11 +53,19 @@ def find_program(name: str, settings: Settings) -> tuple[str | None, list[str]]:
     if not wanted:
         return None, []
     for d in shortcut_dirs(settings):
-        files = [p for p in d.rglob("*") if p.suffix.lower() in SHORTCUT_EXT and "uninstall" not in p.stem.lower()]
+        files = [
+            p
+            for p in d.rglob("*")
+            if p.suffix.lower() in SHORTCUT_EXT and "uninstall" not in p.stem.lower()
+        ]
         exact = [p for p in files if plain(p.stem) == wanted]
         if len(exact) >= 1:
             return str(exact[0]), []
-        partial = [p for p in files if wanted in plain(p.stem) or (len(plain(p.stem)) > 2 and plain(p.stem) in wanted)]
+        partial = [
+            p
+            for p in files
+            if wanted in plain(p.stem) or (len(plain(p.stem)) > 2 and plain(p.stem) in wanted)
+        ]
         if len(partial) == 1:
             return str(partial[0]), []
         if partial:
@@ -70,7 +78,10 @@ def find_program(name: str, settings: Settings) -> tuple[str | None, list[str]]:
 async def open_program(name: str, settings: Settings) -> dict:
     target, candidates = await asyncio.to_thread(find_program, name, settings)
     if candidates:
-        return {"status": "ambiguous", "message": f"Birden fazla eşleşme var: {', '.join(candidates)}. Hangisi?"}
+        return {
+            "status": "ambiguous",
+            "message": f"Birden fazla eşleşme var: {', '.join(candidates)}. Hangisi?",
+        }
     if not target:
         return {"status": "error", "message": f"'{name}' adında bir program bulamadım."}
     label = Path(target).stem if os.path.sep in target else name
@@ -86,8 +97,22 @@ async def open_program(name: str, settings: Settings) -> dict:
 def _powershell(script: Path, *args: str) -> subprocess.CompletedProcess:
     # -File passes each argument as-is; nothing the user says is parsed as code.
     return subprocess.run(
-        ["powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", str(script), *args],
-        capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30, creationflags=NO_WINDOW,
+        [
+            "powershell.exe",
+            "-NoProfile",
+            "-NonInteractive",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(script),
+            *args,
+        ],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=30,
+        creationflags=NO_WINDOW,
     )
 
 
@@ -111,7 +136,7 @@ async def take_screenshot(target: str, settings: Settings) -> dict:
 
 
 def screenshot_dir() -> Path:
-    from ctypes import windll, create_unicode_buffer  # noqa: PLC0415  # Windows only
+    from ctypes import create_unicode_buffer, windll  # noqa: PLC0415  # Windows only
 
     buf = create_unicode_buffer(260)
     windll.shell32.SHGetFolderPathW(None, 0x27, None, 0, buf)  # CSIDL_MYPICTURES
@@ -119,7 +144,9 @@ def screenshot_dir() -> Path:
 
 
 def _run(cmd: list[str]) -> subprocess.CompletedProcess:
-    return subprocess.run(cmd, capture_output=True, text=True, errors="replace", timeout=15, creationflags=NO_WINDOW)
+    return subprocess.run(
+        cmd, capture_output=True, text=True, errors="replace", timeout=15, creationflags=NO_WINDOW
+    )
 
 
 async def lock_computer(settings: Settings) -> dict:
@@ -137,14 +164,30 @@ async def shutdown(mode: str, settings: Settings) -> dict:
     what = "yeniden başlatılacak" if mode == "restart" else "kapatılacak"
     flag = "/r" if mode == "restart" else "/s"
     if settings.dry_run:
-        return {"status": "ok", "message": f"(deneme) Bilgisayar {SHUTDOWN_DELAY} saniye içinde {what}."}
-    cmd = ["shutdown.exe", flag, "/t", str(SHUTDOWN_DELAY), "/c", f"Mario: bilgisayar {SHUTDOWN_DELAY} saniye içinde {what}."]
+        return {
+            "status": "ok",
+            "message": f"(deneme) Bilgisayar {SHUTDOWN_DELAY} saniye içinde {what}.",
+        }
+    cmd = [
+        "shutdown.exe",
+        flag,
+        "/t",
+        str(SHUTDOWN_DELAY),
+        "/c",
+        f"Mario: bilgisayar {SHUTDOWN_DELAY} saniye içinde {what}.",
+    ]
     proc = await asyncio.to_thread(_run, cmd)
     if proc.returncode == 1190:
         return {"status": "error", "message": "Zaten zamanlanmış bir kapatma var."}
     if proc.returncode != 0:
-        return {"status": "error", "message": f"Kapatma başlatılamadı (çıkış kodu {proc.returncode})."}
-    return {"status": "ok", "message": f"Bilgisayar {SHUTDOWN_DELAY} saniye içinde {what}. 'İptal et' diyebilirsin."}
+        return {
+            "status": "error",
+            "message": f"Kapatma başlatılamadı (çıkış kodu {proc.returncode}).",
+        }
+    return {
+        "status": "ok",
+        "message": f"Bilgisayar {SHUTDOWN_DELAY} saniye içinde {what}. 'İptal et' diyebilirsin.",
+    }
 
 
 async def cancel_shutdown(settings: Settings) -> dict:

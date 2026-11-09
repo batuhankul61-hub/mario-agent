@@ -6,20 +6,24 @@ import time
 from types import SimpleNamespace
 
 import pytest
-
 from app import audit
 from app.gemini import GeminiService
 from app.tools import claude, skills
 
-PS_SCRIPT = "﻿# test\n$a = [Console]::In.ReadToEnd() | ConvertFrom-Json\n\"Merhaba $($a.ad)\"\n"
+PS_SCRIPT = '﻿# test\n$a = [Console]::In.ReadToEnd() | ConvertFrom-Json\n"Merhaba $($a.ad)"\n'
 
 
 def write_skill(skills_dir, name="selam", confirm=None, entry="run.py", body=None, **manifest):
     folder = skills_dir / name
     folder.mkdir(parents=True, exist_ok=True)
     data = {
-        "name": name, "description": "Birine selam söyler.", "parameters": {"ad": "Kişinin adı"},
-        "required": ["ad"], "confirm": confirm, "entry": entry, "example": "Ahmet'e selam söyle",
+        "name": name,
+        "description": "Birine selam söyler.",
+        "parameters": {"ad": "Kişinin adı"},
+        "required": ["ad"],
+        "confirm": confirm,
+        "entry": entry,
+        "example": "Ahmet'e selam söyle",
     } | manifest
     (folder / "skill.json").write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
     if "/" in entry or "\\" in entry:
@@ -35,6 +39,7 @@ def write_skill(skills_dir, name="selam", confirm=None, entry="run.py", body=Non
 
 
 # ---------- loading ----------
+
 
 def test_loads_a_valid_skill(settings):
     write_skill(settings.skills_dir)
@@ -79,6 +84,7 @@ def test_prompt_lists_learned_skills(settings):
 
 
 # ---------- running ----------
+
 
 async def test_run_python_skill(settings):
     write_skill(settings.skills_dir)
@@ -130,15 +136,23 @@ def test_destructive_skill_waits_for_voice_yes(client, settings):
     assert ask["status"] == "needs_confirmation"
     assert ask["question"] == "Ahmet kişisine selam gönderilsin mi?"
 
-    done = client.post("/api/tool", json={
-        "name": "confirm_action", "args": {"confirmation_id": ask["confirmation_id"]}, "utterances": ["evet"],
-    }).json()
+    done = client.post(
+        "/api/tool",
+        json={
+            "name": "confirm_action",
+            "args": {"confirmation_id": ask["confirmation_id"]},
+            "utterances": ["evet"],
+        },
+    ).json()
     assert done == {"status": "ok", "message": "Selam söylendi: Ahmet"}
 
 
 def test_harmless_skill_runs_without_asking(client, settings):
     write_skill(settings.skills_dir)
-    res = client.post("/api/tool", json={"name": "run_skill", "args": {"name": "selam", "args_json": '{"ad": "Ali"}'}})
+    res = client.post(
+        "/api/tool",
+        json={"name": "run_skill", "args": {"name": "selam", "args_json": '{"ad": "Ali"}'}},
+    )
     assert res.json()["status"] == "ok"
 
 
@@ -152,17 +166,28 @@ async def test_forget_moves_instead_of_deleting(settings):
 
 
 async def test_list_skills(settings):
-    assert (await skills.list_skills({}, settings))["message"] == "Henüz öğrendiğim bir yetenek yok."
+    assert (await skills.list_skills({}, settings))[
+        "message"
+    ] == "Henüz öğrendiğim bir yetenek yok."
     write_skill(settings.skills_dir)
-    assert (await skills.list_skills({}, settings))["message"] == "Öğrendiğim yetenekler: selam: Birine selam söyler."
+    assert (await skills.list_skills({}, settings))[
+        "message"
+    ] == "Öğrendiğim yetenekler: selam: Birine selam söyler."
 
 
 # ---------- learning through Claude Code ----------
 
+
 @pytest.fixture
 def jobs(settings, tmp_path):
-    return claude.ClaudeJobs("claude", tmp_path / "work", 1, settings.audit_log,
-                             project_dir=tmp_path / "project", skills_dir=settings.skills_dir)
+    return claude.ClaudeJobs(
+        "claude",
+        tmp_path / "work",
+        1,
+        settings.audit_log,
+        project_dir=tmp_path / "project",
+        skills_dir=settings.skills_dir,
+    )
 
 
 def fake_claude(monkeypatch, settings, answer, write=True):
@@ -172,7 +197,9 @@ def fake_claude(monkeypatch, settings, answer, write=True):
         seen.update(cmd=cmd, **kwargs)
         if write:
             write_skill(settings.skills_dir, name="doviz_kuru")
-        return SimpleNamespace(returncode=0, stdout=json.dumps({"is_error": False, "result": answer}), stderr="")
+        return SimpleNamespace(
+            returncode=0, stdout=json.dumps({"is_error": False, "result": answer}), stderr=""
+        )
 
     monkeypatch.setattr(claude.subprocess, "run", run)
     return seen
@@ -187,7 +214,9 @@ async def wait(jobs, job_id):
 
 
 async def test_learning_produces_a_usable_skill(jobs, monkeypatch, settings, tmp_path):
-    seen = fake_claude(monkeypatch, settings, "**SONUÇ:** Döviz kurunu söylemeyi öğrendim.\nYETENEK: `doviz_kuru`")
+    seen = fake_claude(
+        monkeypatch, settings, "**SONUÇ:** Döviz kurunu söylemeyi öğrendim.\nYETENEK: `doviz_kuru`"
+    )
     started = await jobs.learn("dolar kaç TL")
     assert started["kind"] == "skill" and "Öğrenmeye başladım" in started["message"]
 
@@ -205,9 +234,15 @@ async def test_learning_produces_a_usable_skill(jobs, monkeypatch, settings, tmp
 
 
 async def test_claude_says_it_cannot_teach(jobs, monkeypatch, settings):
-    fake_claude(monkeypatch, settings, "SONUÇ: WhatsApp Desktop kurulu değil.\nYETENEK: yok", write=False)
+    fake_claude(
+        monkeypatch, settings, "SONUÇ: WhatsApp Desktop kurulu değil.\nYETENEK: yok", write=False
+    )
     job = await wait(jobs, (await jobs.learn("whatsapp'tan yaz"))["job_id"])
-    assert job.state == "failed" and job.result == "WhatsApp Desktop kurulu değil." and job.skill is None
+    assert (
+        job.state == "failed"
+        and job.result == "WhatsApp Desktop kurulu değil."
+        and job.skill is None
+    )
 
 
 async def test_claimed_skill_that_does_not_load_is_a_failure(jobs, monkeypatch, settings):
@@ -217,7 +252,9 @@ async def test_claimed_skill_that_does_not_load_is_a_failure(jobs, monkeypatch, 
 
 
 def test_learn_skill_asks_permission_first(client, ctx):
-    ask = client.post("/api/tool", json={"name": "learn_skill", "args": {"request": "WhatsApp'tan Ahmet'e yaz"}}).json()
+    ask = client.post(
+        "/api/tool", json={"name": "learn_skill", "args": {"request": "WhatsApp'tan Ahmet'e yaz"}}
+    ).json()
     assert ask["status"] == "needs_confirmation"
     assert ask["question"] == (
         "Bunu henüz bilmiyorum. İzin verirsen Claude sayesinde öğreneyim: «WhatsApp'tan Ahmet'e yaz». Öğreneyim mi?"
@@ -230,16 +267,28 @@ def test_learn_then_use_in_the_same_session(client, ctx, settings, monkeypatch):
     ctx.jobs.skills_dir = settings.skills_dir
     fake_claude(monkeypatch, settings, "SONUÇ: Öğrendim.\nYETENEK: doviz_kuru")
 
-    ask = client.post("/api/tool", json={"name": "learn_skill", "args": {"request": "dolar kaç"}}).json()
-    started = client.post("/api/tool", json={
-        "name": "confirm_action", "args": {"confirmation_id": ask["confirmation_id"]}, "utterances": ["evet öğren"],
-    }).json()
+    ask = client.post(
+        "/api/tool", json={"name": "learn_skill", "args": {"request": "dolar kaç"}}
+    ).json()
+    started = client.post(
+        "/api/tool",
+        json={
+            "name": "confirm_action",
+            "args": {"confirmation_id": ask["confirmation_id"]},
+            "utterances": ["evet öğren"],
+        },
+    ).json()
     for _ in range(100):
         job = client.get(f"/api/jobs/{started['job_id']}").json()
         if job["state"] != "running":
             break
         time.sleep(0.02)
-    assert job["state"] == "done" and job["kind"] == "skill" and job["skill"]["name"] == "doviz_kuru"
+    assert (
+        job["state"] == "done" and job["kind"] == "skill" and job["skill"]["name"] == "doviz_kuru"
+    )
 
-    used = client.post("/api/tool", json={"name": "run_skill", "args": {"name": "doviz_kuru", "args_json": '{"ad": "x"}'}})
+    used = client.post(
+        "/api/tool",
+        json={"name": "run_skill", "args": {"name": "doviz_kuru", "args_json": '{"ad": "x"}'}},
+    )
     assert used.json()["status"] == "ok"

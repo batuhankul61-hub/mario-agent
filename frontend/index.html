@@ -36,6 +36,8 @@
         <svg class="i" viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>Sohbet</a>
       <button type="button" data-open-settings>
         <svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3M4.9 4.9 7 7m10 10 2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/></svg>Ayarlar</button>
+      <button type="button" data-open-dev>
+        <svg class="i" viewBox="0 0 24 24"><path d="m8 7-5 5 5 5m8-10 5 5-5 5M14 4l-4 16"/></svg>Geliştirici</button>
     </nav>
     <div class="side-foot">
       <b>Oturum <span data-session>—</span></b>
@@ -94,6 +96,10 @@
       <button class="send" aria-label="Gönder">
         <svg class="i" viewBox="0 0 24 24"><path d="M12 19V5m-6 6 6-6 6 6"/></svg></button>
     </form>
+    <button type="button" class="mute" data-mute aria-label="Mikrofonu kapat" aria-pressed="false" title="Mikrofonu kapat (M)">
+      <svg class="i on-unmuted" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+      <svg class="i on-muted" viewBox="0 0 24 24"><path d="M15 9.5V6a3 3 0 0 0-5.8-1M9 9v2a3 3 0 0 0 4.6 2.5M19 11a7 7 0 0 1-1.2 3.9M5 11a7 7 0 0 0 10.4 6.1M12 18v3M3 3l18 18"/></svg>
+    </button>
     <button type="button" class="mic" data-toggle aria-label="Başlat">
       <svg class="i on-idle" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
       <svg class="i on-live" viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="2"/></svg>
@@ -106,6 +112,9 @@
       <svg class="i" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7 10h.01M11 10h.01M15 10h.01M7 14h10"/></svg></button>Yaz</div>
     <div class="ctl"><button type="button" id="speaker-btn" aria-label="Hoparlör modu" aria-pressed="false">
       <svg class="i" viewBox="0 0 24 24"><path d="M11 5 6 9H3v6h3l5 4zM15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg></button>Hoparlör</div>
+    <div class="ctl ctl-mute"><button type="button" data-mute aria-label="Mikrofonu kapat" aria-pressed="false">
+      <svg class="i on-unmuted" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+      <svg class="i on-muted" viewBox="0 0 24 24"><path d="M15 9.5V6a3 3 0 0 0-5.8-1M9 9v2a3 3 0 0 0 4.6 2.5M19 11a7 7 0 0 1-1.2 3.9M5 11a7 7 0 0 0 10.4 6.1M12 18v3M3 3l18 18"/></svg></button><span class="mute-label">Sessiz</span></div>
     <div class="ctl"><button type="button" class="go" data-toggle aria-label="Başlat">
       <svg class="i on-idle" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
       <svg class="i on-live" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button><span class="go-label">Başlat</span></div>
@@ -157,6 +166,31 @@
         <span><b>Hoparlör modu</b><small>Hoparlörden kullanırken Mario kendi sesini duymasın.</small></span>
         <input type="checkbox" id="speaker" class="switch">
       </label>
+
+      <h3>Geliştirici</h3>
+      <button type="button" class="row-link" data-open-dev>
+        <span><b>Öğrenilen yetenekler</b><small>Mario'nun Claude ile öğrendiği komutlar, kodları ve kullanımı.</small></span>
+        <svg class="i" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></button>
+    </form>
+  </dialog>
+
+  <dialog id="dev" class="panel dev" aria-labelledby="dev-title">
+    <form method="dialog">
+      <header>
+        <h2 id="dev-title">Geliştirici</h2>
+        <div class="head-actions">
+          <button type="button" class="icon-btn" id="dev-refresh" aria-label="Yenile">
+            <svg class="i" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7L21 8m0-5v5h-5"/></svg></button>
+          <button class="done" value="close">Bitti</button>
+        </div>
+      </header>
+      <p class="muted dev-summary" id="dev-summary">Yükleniyor…</p>
+      <h3>Öğrenilen yetenekler</h3>
+      <div id="dev-list" class="dev-list"></div>
+      <div id="dev-forgotten-wrap" hidden>
+        <h3>Unutulanlar</h3>
+        <ul id="dev-forgotten" class="dev-forgotten"></ul>
+      </div>
     </form>
   </dialog>
 

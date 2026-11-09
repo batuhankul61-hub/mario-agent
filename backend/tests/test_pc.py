@@ -1,7 +1,6 @@
 """PC settings with every Windows helper faked: no test changes this machine."""
 
 import pytest
-
 from app import audit
 from app.tools import pc
 
@@ -9,8 +8,12 @@ from app.tools import pc
 @pytest.fixture
 def audio(monkeypatch):
     state = {"device": "Kulaklıklar (TUF H1)", "level": 40, "muted": False, "set": []}
-    monkeypatch.setattr(pc, "_audio_sync", lambda: {k: state[k] for k in ("device", "level", "muted")})
-    monkeypatch.setattr(pc, "_set_audio_sync", lambda level, mute: state["set"].append((level, mute)))
+    monkeypatch.setattr(
+        pc, "_audio_sync", lambda: {k: state[k] for k in ("device", "level", "muted")}
+    )
+    monkeypatch.setattr(
+        pc, "_set_audio_sync", lambda level, mute: state["set"].append((level, mute))
+    )
     return state
 
 
@@ -103,7 +106,9 @@ async def test_switch_output_by_spoken_name(settings, outputs):
 
 async def test_ambiguous_output_lists_choices(settings, outputs):
     res = await pc.set_audio_output({"device": "AMD"}, settings)
-    assert res["status"] == "ambiguous" and "Legion" in res["message"] and "VG259QR" in res["message"]
+    assert (
+        res["status"] == "ambiguous" and "Legion" in res["message"] and "VG259QR" in res["message"]
+    )
     assert outputs == []
 
 
@@ -129,13 +134,19 @@ async def test_brightness_without_ddc(settings, monkeypatch):
 @pytest.fixture
 def registry(monkeypatch):
     writes = []
-    monkeypatch.setattr(pc, "_write_dwords", lambda path, values, broadcast: writes.append((path, values, broadcast)))
+    monkeypatch.setattr(
+        pc,
+        "_write_dwords",
+        lambda path, values, broadcast: writes.append((path, values, broadcast)),
+    )
     return writes
 
 
 async def test_dark_theme(settings, registry):
     assert (await pc.set_theme({"mode": "dark"}, settings))["message"] == "Koyu temaya geçildi."
-    assert registry == [(pc.PERSONALIZE, {"AppsUseLightTheme": 0, "SystemUsesLightTheme": 0}, "ImmersiveColorSet")]
+    assert registry == [
+        (pc.PERSONALIZE, {"AppsUseLightTheme": 0, "SystemUsesLightTheme": 0}, "ImmersiveColorSet")
+    ]
 
 
 async def test_bad_theme(settings, registry):
@@ -151,27 +162,37 @@ async def test_do_not_disturb_turns_toasts_off(settings, registry):
 async def test_open_settings_only_known_pages(settings, monkeypatch):
     opened = []
     monkeypatch.setattr("os.startfile", opened.append, raising=False)
-    assert (await pc.open_settings({"page": "nightlight"}, settings))["message"] == "Gece ışığı ayarları açıldı."
+    assert (await pc.open_settings({"page": "nightlight"}, settings))[
+        "message"
+    ] == "Gece ışığı ayarları açıldı."
     assert (await pc.open_settings({"page": "file:///C:/Windows"}, settings))["status"] == "error"
     assert opened == ["ms-settings:nightlight"]
 
 
 async def test_radio_missing(settings, monkeypatch):
     monkeypatch.setattr(pc, "_set_radio_sync", lambda kind, on: "missing")
-    assert (await pc.set_radio({"radio": "wifi", "on": True}, settings))["message"] == "Bu bilgisayarda Wi-Fi yok."
+    assert (await pc.set_radio({"radio": "wifi", "on": True}, settings))[
+        "message"
+    ] == "Bu bilgisayarda Wi-Fi yok."
 
 
 async def test_bluetooth_off(settings, monkeypatch):
     calls = []
     monkeypatch.setattr(pc, "_set_radio_sync", lambda kind, on: calls.append((kind, on)) or "ok")
-    assert (await pc.set_radio({"radio": "bluetooth", "on": False}, settings))["message"] == "Bluetooth kapatıldı."
+    assert (await pc.set_radio({"radio": "bluetooth", "on": False}, settings))[
+        "message"
+    ] == "Bluetooth kapatıldı."
     assert calls == [("bluetooth", False)]
 
 
 def test_wifi_off_needs_confirmation_but_wifi_on_does_not(client, monkeypatch, settings):
     monkeypatch.setattr(pc, "_set_radio_sync", lambda kind, on: "ok")
-    on = client.post("/api/tool", json={"name": "set_radio", "args": {"radio": "wifi", "on": True}}).json()
-    off = client.post("/api/tool", json={"name": "set_radio", "args": {"radio": "wifi", "on": False}}).json()
+    on = client.post(
+        "/api/tool", json={"name": "set_radio", "args": {"radio": "wifi", "on": True}}
+    ).json()
+    off = client.post(
+        "/api/tool", json={"name": "set_radio", "args": {"radio": "wifi", "on": False}}
+    ).json()
     assert on["status"] == "ok"
     assert off["status"] == "needs_confirmation" and "bağlantı kopabilir" in off["question"]
 
@@ -194,7 +215,12 @@ def plans(monkeypatch):
 
 @pytest.mark.parametrize(
     ("spoken", "guid"),
-    [("dengeli", "381b4222"), ("balanced", "381b4222"), ("güç tasarrufu", "a1841308"), ("nihai", "c8c0d4bb")],
+    [
+        ("dengeli", "381b4222"),
+        ("balanced", "381b4222"),
+        ("güç tasarrufu", "a1841308"),
+        ("nihai", "c8c0d4bb"),
+    ],
 )
 async def test_power_plan_by_name_or_alias(settings, plans, spoken, guid):
     assert (await pc.set_power_plan({"plan": spoken}, settings))["status"] == "ok"
@@ -254,11 +280,18 @@ async def test_never_closes_windows_or_mario_itself(settings, windows, name):
 
 
 def test_close_program_waits_for_voice_yes(client, windows, settings):
-    ask = client.post("/api/tool", json={"name": "close_program", "args": {"name": "discord"}}).json()
+    ask = client.post(
+        "/api/tool", json={"name": "close_program", "args": {"name": "discord"}}
+    ).json()
     assert ask["status"] == "needs_confirmation" and windows == []
-    done = client.post("/api/tool", json={
-        "name": "confirm_action", "args": {"confirmation_id": ask["confirmation_id"]}, "utterances": ["evet kapat"],
-    }).json()
+    done = client.post(
+        "/api/tool",
+        json={
+            "name": "confirm_action",
+            "args": {"confirmation_id": ask["confirmation_id"]},
+            "utterances": ["evet kapat"],
+        },
+    ).json()
     assert done["status"] == "ok" and windows == [40]
     assert audit.tail(settings.audit_log)[-1]["confirmed_by"] == "voice: evet kapat"
 
@@ -279,8 +312,11 @@ async def test_status_survives_a_failing_part(settings, monkeypatch, audio, mic)
     monkeypatch.setattr(pc, "_theme_sync", lambda: "dark")
     monkeypatch.setattr(pc, "_notifications_sync", lambda: False)
     monkeypatch.setattr(pc, "_radios_sync", lambda: {"bluetooth": "on"})
-    monkeypatch.setattr(pc, "_network_sync", lambda: {"wifi": None, "signal": None,
-                                                      "wired": [{"name": "Ethernet", "speed_mbps": 1000}]})
+    monkeypatch.setattr(
+        pc,
+        "_network_sync",
+        lambda: {"wifi": None, "signal": None, "wired": [{"name": "Ethernet", "speed_mbps": 1000}]},
+    )
     monkeypatch.setattr(pc, "_plans_sync", lambda: (PLANS, "381b4222-f694-41f0-9685-ff5bb260df2e"))
     monkeypatch.setattr(pc, "_system_sync", lambda: {"cpu": 12, "ram": 70, "battery": None})
 

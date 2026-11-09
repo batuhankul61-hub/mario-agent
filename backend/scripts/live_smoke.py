@@ -36,10 +36,20 @@ async def turn(ws, api: httpx.AsyncClient, text: str, state: dict) -> None:
                 utterances = []
                 if fc["name"] == "confirm_action":
                     utterances = [h["text"] for h in state["heard"] if h["at"] >= state["mark"]]
-                res = (await api.post("/api/tool", json={"name": fc["name"], "args": fc.get("args", {}),
-                                                          "utterances": utterances})).json()
-                print(f"ARAÇ  : {fc['name']}({json.dumps(fc.get('args', {}), ensure_ascii=False)}) -> "
-                      f"{res.get('status')}: {res.get('message')}")
+                res = (
+                    await api.post(
+                        "/api/tool",
+                        json={
+                            "name": fc["name"],
+                            "args": fc.get("args", {}),
+                            "utterances": utterances,
+                        },
+                    )
+                ).json()
+                print(
+                    f"ARAÇ  : {fc['name']}({json.dumps(fc.get('args', {}), ensure_ascii=False)}) -> "
+                    f"{res.get('status')}: {res.get('message')}"
+                )
                 if res.get("status") == "needs_confirmation":
                     state["mark"] = time.monotonic()
                 responses.append({"id": fc["id"], "name": fc["name"], "response": res})

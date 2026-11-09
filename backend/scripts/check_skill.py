@@ -17,10 +17,17 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from app.config import get_settings  # noqa: E402
 from app.tools import TOOLS, skills  # noqa: E402
 
-META = {"confirm_action", "cancel_action", "run_skill", "list_skills", "forget_skill", "learn_skill"}
+META = {
+    "confirm_action",
+    "cancel_action",
+    "run_skill",
+    "list_skills",
+    "forget_skill",
+    "learn_skill",
+}
 PS_PARSE = (
     "$e = $null; [void][System.Management.Automation.Language.Parser]::ParseFile($env:SKILL_FILE, [ref]$null, [ref]$e);"
-    " $e | ForEach-Object { \"$($_.Extent.StartLineNumber): $($_.Message)\" }"
+    ' $e | ForEach-Object { "$($_.Extent.StartLineNumber): $($_.Message)" }'
 )
 
 
@@ -48,11 +55,17 @@ def check(folder: Path) -> list[str]:
             problems.append(f"{skill.entry.name}: {exc.msg}")
     else:
         if not skill.entry.read_bytes().startswith(b"\xef\xbb\xbf"):
-            problems.append(f"{skill.entry.name}: UTF-8 BOM ile kaydedilmeli (PowerShell 5.1 Türkçe harfleri bozar).")
+            problems.append(
+                f"{skill.entry.name}: UTF-8 BOM ile kaydedilmeli (PowerShell 5.1 Türkçe harfleri bozar)."
+            )
         out = subprocess.run(
             ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", PS_PARSE],
             env={**os.environ, "SKILL_FILE": str(skill.entry)},
-            capture_output=True, text=True, encoding="oem", errors="replace", timeout=30,
+            capture_output=True,
+            text=True,
+            encoding="oem",
+            errors="replace",
+            timeout=30,
         ).stdout.strip()
         problems += [f"{skill.entry.name}:{line}" for line in out.splitlines() if line.strip()]
     if skill.confirm:

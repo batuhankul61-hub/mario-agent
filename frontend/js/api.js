@@ -42,6 +42,7 @@ async function request(method, path, body) {
 
 export const createToken = () => request("POST", "/api/token", {});
 export const runTool = (name, args, utterances = []) => request("POST", "/api/tool", { name, args, utterances });
+export const devSkills = () => request("GET", "/api/dev/skills");
 export const answerConfirmation = (id, approved) => request("POST", `/api/confirm/${encodeURIComponent(id)}`, { approved });
 export const jobStatus = (id) => request("GET", `/api/jobs/${encodeURIComponent(id)}`);
 

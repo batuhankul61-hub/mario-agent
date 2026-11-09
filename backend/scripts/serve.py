@@ -25,7 +25,10 @@ LOGGING = {
         }
     },
     "root": {"handlers": ["file"], "level": "INFO"},
-    "loggers": {name: {"handlers": [], "propagate": True} for name in ("uvicorn", "uvicorn.error", "uvicorn.access")},
+    "loggers": {
+        name: {"handlers": [], "propagate": True}
+        for name in ("uvicorn", "uvicorn.error", "uvicorn.access")
+    },
 }
 
 
@@ -35,7 +38,9 @@ def main() -> None:
     LOG.parent.mkdir(parents=True, exist_ok=True)
     logging.config.dictConfig(LOGGING)
     try:
-        uvicorn.run("app.main:app", host="127.0.0.1", port=8100, log_config=LOGGING, app_dir=str(BACKEND))
+        uvicorn.run(
+            "app.main:app", host="127.0.0.1", port=8100, log_config=LOGGING, app_dir=str(BACKEND)
+        )
     except BaseException:
         logging.getLogger("serve").exception("Server stopped")
         raise

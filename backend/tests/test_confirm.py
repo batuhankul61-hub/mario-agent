@@ -1,5 +1,4 @@
 import pytest
-
 from app.confirm import PendingActions, is_affirmative
 
 

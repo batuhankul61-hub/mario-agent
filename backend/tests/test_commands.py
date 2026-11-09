@@ -9,17 +9,21 @@ from types import SimpleNamespace
 
 import httpx
 import pytest
-
 from app import audit
 from app.tools import claude, system, web
 
-
 # ---------- open_program ----------
+
 
 @pytest.fixture
 def programs(settings, monkeypatch):
     settings.programs_dir.mkdir(parents=True)
-    for name in ("Flo Desk.lnk", "Google Chrome.lnk", "Chrome Remote Desktop.lnk", "Uninstall Chrome.lnk"):
+    for name in (
+        "Flo Desk.lnk",
+        "Google Chrome.lnk",
+        "Chrome Remote Desktop.lnk",
+        "Uninstall Chrome.lnk",
+    ):
         (settings.programs_dir / name).write_text("")
     # Keep the real Start Menu out of the tests.
     monkeypatch.delenv("APPDATA", raising=False)
@@ -76,6 +80,7 @@ async def test_dry_run_opens_nothing(settings, programs):
 
 # ---------- screenshot / shutdown (subprocess faked) ----------
 
+
 class Recorder(list):
     """Stands in for subprocess.run: records each command, returns `result`."""
 
@@ -122,7 +127,9 @@ async def test_shutdown_uses_30s_delay(settings, ran):
 
 async def test_shutdown_already_scheduled(settings, ran):
     ran.result.returncode = 1190
-    assert (await system.shutdown("shutdown", settings))["message"] == "Zaten zamanlanmış bir kapatma var."
+    assert (await system.shutdown("shutdown", settings))[
+        "message"
+    ] == "Zaten zamanlanmış bir kapatma var."
 
 
 async def test_shutdown_dry_run_runs_nothing(settings, ran):
@@ -138,15 +145,35 @@ async def test_cancel_shutdown(settings, ran):
 
 # ---------- weather / time ----------
 
+
 def weather_api(request: httpx.Request) -> httpx.Response:
     if "geocoding" in request.url.host:
         if request.url.params["name"] == "Atlantis":
             return httpx.Response(200, json={})
-        return httpx.Response(200, json={"results": [{"name": "İstanbul", "country": "Türkiye", "latitude": 41.0, "longitude": 29.0}]})
-    return httpx.Response(200, json={
-        "current": {"temperature_2m": 14.6, "apparent_temperature": 12.2, "weather_code": 61, "wind_speed_10m": 18.0},
-        "daily": {"temperature_2m_max": [17.1], "temperature_2m_min": [10.4], "precipitation_probability_max": [80]},
-    })
+        return httpx.Response(
+            200,
+            json={
+                "results": [
+                    {"name": "İstanbul", "country": "Türkiye", "latitude": 41.0, "longitude": 29.0}
+                ]
+            },
+        )
+    return httpx.Response(
+        200,
+        json={
+            "current": {
+                "temperature_2m": 14.6,
+                "apparent_temperature": 12.2,
+                "weather_code": 61,
+                "wind_speed_10m": 18.0,
+            },
+            "daily": {
+                "temperature_2m_max": [17.1],
+                "temperature_2m_min": [10.4],
+                "precipitation_probability_max": [80],
+            },
+        },
+    )
 
 
 @pytest.fixture
@@ -180,6 +207,7 @@ async def test_time_in_turkish():
 
 # ---------- Claude Code jobs ----------
 
+
 async def wait_done(jobs, job_id):
     for _ in range(100):
         if jobs.jobs[job_id].state != "running":
@@ -193,7 +221,11 @@ async def test_claude_job_success(ctx, monkeypatch):
 
     def fake_run(cmd, **kwargs):
         seen.update(cmd=cmd, **kwargs)
-        return SimpleNamespace(returncode=0, stdout=json.dumps({"is_error": False, "result": "Masaüstünde 4 dosya var."}), stderr="")
+        return SimpleNamespace(
+            returncode=0,
+            stdout=json.dumps({"is_error": False, "result": "Masaüstünde 4 dosya var."}),
+            stderr="",
+        )
 
     monkeypatch.setattr(claude.subprocess, "run", fake_run)
     started = await ctx.jobs.start("--help masaüstündeki dosyaları listele")
@@ -215,7 +247,11 @@ async def test_claude_not_installed(ctx):
 
 async def test_claude_not_logged_in(ctx, monkeypatch):
     out = json.dumps({"is_error": True, "result": "Not logged in · Please run /login"})
-    monkeypatch.setattr(claude.subprocess, "run", lambda cmd, **kw: SimpleNamespace(returncode=1, stdout=out, stderr=""))
+    monkeypatch.setattr(
+        claude.subprocess,
+        "run",
+        lambda cmd, **kw: SimpleNamespace(returncode=1, stdout=out, stderr=""),
+    )
     job = await wait_done(ctx.jobs, (await ctx.jobs.start("x"))["job_id"])
     assert "/login" in job.result and "oturum açılmamış" in job.result
 
@@ -235,14 +271,25 @@ async def test_empty_task_is_rejected(ctx):
 
 def test_delegate_through_api_needs_voice_yes_then_polls(client, ctx, monkeypatch):
     out = json.dumps({"is_error": False, "result": "Tamamlandı."})
-    monkeypatch.setattr(claude.subprocess, "run", lambda cmd, **kw: SimpleNamespace(returncode=0, stdout=out, stderr=""))
+    monkeypatch.setattr(
+        claude.subprocess,
+        "run",
+        lambda cmd, **kw: SimpleNamespace(returncode=0, stdout=out, stderr=""),
+    )
 
-    ask = client.post("/api/tool", json={"name": "delegate_to_claude", "args": {"task": "README'yi güncelle"}}).json()
+    ask = client.post(
+        "/api/tool", json={"name": "delegate_to_claude", "args": {"task": "README'yi güncelle"}}
+    ).json()
     assert ask["status"] == "needs_confirmation" and ctx.jobs.jobs == {}
 
-    done = client.post("/api/tool", json={
-        "name": "confirm_action", "args": {"confirmation_id": ask["confirmation_id"]}, "utterances": ["evet ver"],
-    }).json()
+    done = client.post(
+        "/api/tool",
+        json={
+            "name": "confirm_action",
+            "args": {"confirmation_id": ask["confirmation_id"]},
+            "utterances": ["evet ver"],
+        },
+    ).json()
     assert done["status"] == "ok"
     job_id = done["job_id"]
     for _ in range(100):

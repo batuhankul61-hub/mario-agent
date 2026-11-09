@@ -10,16 +10,49 @@ FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
 
 # WMO weather codes, grouped the way people say them.
 WEATHER = {
-    0: "açık", 1: "çoğunlukla açık", 2: "parçalı bulutlu", 3: "kapalı", 45: "sisli", 48: "kırağılı sis",
-    51: "hafif çiseleme", 53: "çiseleme", 55: "yoğun çiseleme", 61: "hafif yağmurlu", 63: "yağmurlu",
-    65: "şiddetli yağmurlu", 66: "dondurucu yağmur", 67: "dondurucu yağmur", 71: "hafif karlı", 73: "karlı",
-    75: "yoğun karlı", 77: "kar taneli", 80: "sağanak", 81: "sağanak", 82: "şiddetli sağanak",
-    85: "kar sağanağı", 86: "yoğun kar sağanağı", 95: "gök gürültülü fırtına", 96: "dolulu fırtına",
+    0: "açık",
+    1: "çoğunlukla açık",
+    2: "parçalı bulutlu",
+    3: "kapalı",
+    45: "sisli",
+    48: "kırağılı sis",
+    51: "hafif çiseleme",
+    53: "çiseleme",
+    55: "yoğun çiseleme",
+    61: "hafif yağmurlu",
+    63: "yağmurlu",
+    65: "şiddetli yağmurlu",
+    66: "dondurucu yağmur",
+    67: "dondurucu yağmur",
+    71: "hafif karlı",
+    73: "karlı",
+    75: "yoğun karlı",
+    77: "kar taneli",
+    80: "sağanak",
+    81: "sağanak",
+    82: "şiddetli sağanak",
+    85: "kar sağanağı",
+    86: "yoğun kar sağanağı",
+    95: "gök gürültülü fırtına",
+    96: "dolulu fırtına",
     99: "dolulu fırtına",
 }
 
 DAYS = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar"]
-MONTHS = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"]
+MONTHS = [
+    "Ocak",
+    "Şubat",
+    "Mart",
+    "Nisan",
+    "Mayıs",
+    "Haziran",
+    "Temmuz",
+    "Ağustos",
+    "Eylül",
+    "Ekim",
+    "Kasım",
+    "Aralık",
+]
 
 # Tests swap this for an httpx.MockTransport.
 transport: httpx.AsyncBaseTransport | None = None
@@ -50,7 +83,10 @@ async def get_weather(city: str) -> dict:
             )
             fc.raise_for_status()
     except httpx.HTTPError as exc:
-        return {"status": "error", "message": f"Hava durumu servisine ulaşılamadı ({exc.__class__.__name__})."}
+        return {
+            "status": "error",
+            "message": f"Hava durumu servisine ulaşılamadı ({exc.__class__.__name__}).",
+        }
 
     data = fc.json()
     cur, daily = data["current"], data["daily"]

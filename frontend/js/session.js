@@ -27,6 +27,7 @@ export class Agent extends EventTarget {
     this.playing = false;
     this.drainedAt = 0;
     this.ended = false;
+    this.muted = false;
     // When the last confirmation question was asked; only words said after
     // this count as the user's answer.
     this.confirmMark = 0;
@@ -83,6 +84,12 @@ export class Agent extends EventTarget {
   }
 
   onMic({ pcm, rms }) {
+    // Muted: keep streaming, but silence, so the server's voice detection
+    // still ends the user's turn and Mario can't be cut off by room noise.
+    if (this.muted) {
+      pcm.fill(0);
+      rms = 0;
+    }
     this.emit("level", rms);
     if (!this.live?.ready) return;
     if (this.speakerMode && this.speaking && rms < SPEAKER_GATE_RMS) pcm.fill(0);

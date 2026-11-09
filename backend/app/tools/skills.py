@@ -79,12 +79,16 @@ def load_skill(folder: Path) -> Skill:
         raise InvalidSkill("skill.json bir JSON nesnesi olmalı.")
     name = data.get("name")
     if not isinstance(name, str) or not NAME_RE.match(name) or name != folder.name:
-        raise InvalidSkill("name, klasör adıyla aynı olmalı ve küçük harf, rakam, alt çizgiden oluşmalı.")
+        raise InvalidSkill(
+            "name, klasör adıyla aynı olmalı ve küçük harf, rakam, alt çizgiden oluşmalı."
+        )
     description = data.get("description")
     if not isinstance(description, str) or not description.strip():
         raise InvalidSkill("description boş olamaz.")
     params = data.get("parameters") or {}
-    if not isinstance(params, dict) or not all(isinstance(k, str) and isinstance(v, str) for k, v in params.items()):
+    if not isinstance(params, dict) or not all(
+        isinstance(k, str) and isinstance(v, str) for k, v in params.items()
+    ):
         raise InvalidSkill("parameters, {ad: açıklama} biçiminde olmalı.")
     required = data.get("required") or []
     if not isinstance(required, list) or not set(required) <= set(params):
@@ -94,17 +98,32 @@ def load_skill(folder: Path) -> Skill:
         raise InvalidSkill("confirm ya null ya da bir soru metni olmalı.")
     entry_name = data.get("entry")
     entry = (folder / str(entry_name)).resolve() if entry_name else None
-    if not entry or entry.parent != folder.resolve() or entry.suffix.lower() not in ENTRIES or not entry.is_file():
+    if (
+        not entry
+        or entry.parent != folder.resolve()
+        or entry.suffix.lower() not in ENTRIES
+        or not entry.is_file()
+    ):
         raise InvalidSkill("entry, klasördeki bir .ps1 ya da .py dosyası olmalı.")
-    return Skill(name, description.strip(), folder, entry, params, tuple(required), confirm,
-                 str(data.get("example") or ""))
+    return Skill(
+        name,
+        description.strip(),
+        folder,
+        entry,
+        params,
+        tuple(required),
+        confirm,
+        str(data.get("example") or ""),
+    )
 
 
 def load_skills(skills_dir: Path) -> dict[str, Skill]:
     found: dict[str, Skill] = {}
     if not skills_dir.is_dir():
         return found
-    for folder in sorted(p for p in skills_dir.iterdir() if p.is_dir() and not p.name.startswith(("_", "."))):
+    for folder in sorted(
+        p for p in skills_dir.iterdir() if p.is_dir() and not p.name.startswith(("_", "."))
+    ):
         try:
             found[folder.name] = load_skill(folder)
         except InvalidSkill as exc:
@@ -144,7 +163,19 @@ def skill_question(args: dict, settings: Settings) -> str | None:
 
 def _command(skill: Skill) -> list[str]:
     if skill.entry.suffix.lower() == ".ps1":
-        return ["powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", str(skill.entry)]
+        # Windows PowerShell reads stdin in the OEM code page, so Turkish letters in the JSON
+        # (Şımarık, ğ, ı) arrive garbled unless stdin is switched to UTF-8 before the script runs.
+        path = str(skill.entry).replace("'", "''")
+        return [
+            "powershell.exe",
+            "-NoProfile",
+            "-NonInteractive",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Command",
+            "[Console]::InputEncoding = [Console]::OutputEncoding = New-Object Text.UTF8Encoding $false; "
+            f"& '{path}'; exit $LASTEXITCODE",
+        ]
     # -I: isolated mode, so the skill folder can't shadow standard modules. It also ignores
     # PYTHONIOENCODING, hence -X utf8 for the Turkish text on stdin/stdout.
     return [sys.executable, "-I", "-X", "utf8", str(skill.entry)]
@@ -152,8 +183,15 @@ def _command(skill: Skill) -> list[str]:
 
 def _execute(skill: Skill, args: dict) -> subprocess.CompletedProcess:
     return subprocess.run(
-        _command(skill), input=json.dumps(args, ensure_ascii=False), cwd=skill.folder, capture_output=True,
-        text=True, encoding="utf-8", errors="replace", timeout=RUN_TIMEOUT, creationflags=NO_WINDOW,
+        _command(skill),
+        input=json.dumps(args, ensure_ascii=False),
+        cwd=skill.folder,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=RUN_TIMEOUT,
+        creationflags=NO_WINDOW,
     )
 
 
@@ -190,7 +228,8 @@ async def list_skills(args: dict, settings: Settings) -> dict:
         return {"status": "ok", "message": "Henüz öğrendiğim bir yetenek yok.", "skills": []}
     return {
         "status": "ok",
-        "message": "Öğrendiğim yetenekler: " + "; ".join(f"{s.name}: {s.description}" for s in skills.values()),
+        "message": "Öğrendiğim yetenekler: "
+        + "; ".join(f"{s.name}: {s.description}" for s in skills.values()),
         "skills": [s.signature() for s in skills.values()],
     }
 
@@ -206,4 +245,7 @@ async def forget_skill(args: dict, settings: Settings) -> dict:
     target = settings.skills_dir / FORGOTTEN / f"{name}-{dt.datetime.now():%Y%m%d-%H%M%S}"
     target.parent.mkdir(parents=True, exist_ok=True)
     await asyncio.to_thread(shutil.move, str(skill.folder), str(target))
-    return {"status": "ok", "message": f"{name} yeteneğini unuttum. Geri almak için klasörü {target} konumundan geri taşıyabilirsin."}
+    return {
+        "status": "ok",
+        "message": f"{name} yeteneğini unuttum. Geri almak için klasörü {target} konumundan geri taşıyabilirsin.",
+    }

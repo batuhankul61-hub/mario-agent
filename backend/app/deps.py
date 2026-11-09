@@ -33,8 +33,15 @@ def get_pending() -> PendingActions:
 @lru_cache
 def get_context() -> Context:
     s = get_settings()
-    jobs = ClaudeJobs(s.claude_path, s.claude_workdir, s.claude_timeout_minutes, s.audit_log, s.dry_run,
-                      project_dir=ROOT_DIR, skills_dir=s.skills_dir)
+    jobs = ClaudeJobs(
+        s.claude_path,
+        s.claude_workdir,
+        s.claude_timeout_minutes,
+        s.audit_log,
+        s.dry_run,
+        project_dir=ROOT_DIR,
+        skills_dir=s.skills_dir,
+    )
     return Context(settings=s, jobs=jobs)
 
 
@@ -44,12 +51,16 @@ def is_local(request: Request) -> bool:
 
 
 def require_access(
-    request: Request, x_access_code: str = Header(default=""), settings: Settings = Depends(get_settings)
+    request: Request,
+    x_access_code: str = Header(default=""),
+    settings: Settings = Depends(get_settings),
 ) -> None:
     """This API runs commands on the PC: anything not from the PC itself needs the code."""
     if is_local(request):
         return
     if not settings.access_code:
-        raise HTTPException(status_code=403, detail="Uzaktan erişim kapalı. backend/.env içinde ACCESS_CODE ayarla.")
+        raise HTTPException(
+            status_code=403, detail="Uzaktan erişim kapalı. backend/.env içinde ACCESS_CODE ayarla."
+        )
     if not hmac.compare_digest(x_access_code.encode(), settings.access_code.encode()):
         raise HTTPException(status_code=401, detail="Erişim kodu yanlış ya da eksik.")

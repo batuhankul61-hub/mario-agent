@@ -14,15 +14,24 @@ def test_remote_is_closed_without_configured_code(phone):
 def test_remote_needs_the_right_code(phone, settings):
     settings.access_code = "secret-code"
     assert phone.post("/api/tool", json={"name": "get_time"}).status_code == 401
-    assert phone.post("/api/tool", json={"name": "get_time"}, headers={"X-Access-Code": "nope"}).status_code == 401
-    ok = phone.post("/api/tool", json={"name": "get_time"}, headers={"X-Access-Code": "secret-code"})
+    assert (
+        phone.post(
+            "/api/tool", json={"name": "get_time"}, headers={"X-Access-Code": "nope"}
+        ).status_code
+        == 401
+    )
+    ok = phone.post(
+        "/api/tool", json={"name": "get_time"}, headers={"X-Access-Code": "secret-code"}
+    )
     assert ok.status_code == 200
 
 
 def test_tailscale_proxy_is_not_treated_as_local(client, settings):
     # `tailscale serve` connects from 127.0.0.1 but adds forwarding headers.
     settings.access_code = "secret-code"
-    res = client.post("/api/tool", json={"name": "get_time"}, headers={"X-Forwarded-For": "100.64.0.7"})
+    res = client.post(
+        "/api/tool", json={"name": "get_time"}, headers={"X-Forwarded-For": "100.64.0.7"}
+    )
     assert res.status_code == 401
     res = client.post("/api/token", headers={"Tailscale-User-Login": "batu@example.com"})
     assert res.status_code == 401

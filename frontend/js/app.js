@@ -1,5 +1,6 @@
 import { ApiError, accessCode, imageUrl } from "./api.js";
 import { Agent } from "./session.js";
+import { initDev } from "./dev.js";
 
 const $ = (id) => document.getElementById(id);
 const $$ = (sel) => document.querySelectorAll(sel);
@@ -98,6 +99,7 @@ $("settings").addEventListener("click", (e) => {
   else if (b?.dataset.theme) setTheme(b.dataset.theme);
 });
 for (const b of $$("[data-open-settings]")) b.addEventListener("click", () => $("settings").showModal());
+initDev(() => askCode());
 
 function setSpeaker(on) {
   $("speaker").checked = on;
@@ -125,7 +127,8 @@ $("type-btn").addEventListener("click", () => {
 // ---------- State ----------
 function setState(state) {
   document.body.dataset.state = state;
-  for (const n of $$("[data-status]")) n.textContent = STATUS[state] ?? state;
+  const muted = state === "listening" && document.body.classList.contains("mic-off");
+  for (const n of $$("[data-status]")) n.textContent = muted ? "Mikrofon kapalı" : STATUS[state] ?? state;
   if (state === "idle" || state === "ended") {
     $("cap").textContent = "Konuşmak için başlat.";
     $("cap-prev").textContent = "";
@@ -388,7 +391,30 @@ async function stop() {
   setState("idle");
 }
 
+/** Closes or opens the mic for the running session; Mario keeps talking either way. */
+function setMuted(on) {
+  if (agent) agent.muted = on;
+  document.body.classList.toggle("mic-off", on);
+  for (const b of $$("[data-mute]")) {
+    b.setAttribute("aria-pressed", String(on));
+    b.setAttribute("aria-label", on ? "Mikrofonu aç" : "Mikrofonu kapat");
+    b.title = on ? "Mikrofonu aç (M)" : "Mikrofonu kapat (M)";
+  }
+  for (const n of $$(".mute-label")) n.textContent = on ? "Sesi aç" : "Sessiz";
+  if (on) micLevel = 0;
+  setState(document.body.dataset.state);
+}
+for (const b of $$("[data-mute]")) b.addEventListener("click", () => agent && setMuted(!agent.muted));
+// M toggles the mic, unless the user is typing somewhere.
+document.addEventListener("keydown", (e) => {
+  if (e.key.toLowerCase() !== "m" || e.ctrlKey || e.metaKey || e.altKey || !agent) return;
+  if (e.target.closest?.("input, textarea, [contenteditable]") || document.querySelector("dialog[open]")) return;
+  e.preventDefault();
+  setMuted(!agent.muted);
+});
+
 function setMain(running) {
+  if (!running) setMuted(false);
   document.body.classList.toggle("live", running);
   for (const b of $$("[data-toggle]")) {
     b.setAttribute("aria-label", running ? "Bitir" : "Başlat");
