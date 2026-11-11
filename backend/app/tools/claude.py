@@ -12,13 +12,13 @@ import json
 import re
 import secrets
 import subprocess
-import sys
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
 from .. import audit, experience
+from ..config import RESOURCE_DIR, python_ps
 from . import skills
 
 NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
@@ -73,12 +73,12 @@ SCREEN = """Mario sesli asistanına kullanıcıdan bir ekran görevi geldi; kull
 «{task}»
 
 Bu bilgisayarın ekranını şu yardımcıyla görüp kullan (PowerShell'den):
-  & "{py}" "{helper}" windows                         açık pencereler, en öndeki ilk
-  & "{py}" "{helper}" read [--window AD]              penceredeki düğme, alan ve bağlantılar, numaralı
-  & "{py}" "{helper}" click <numara|ad>               son okunan listedeki bir öğeye tıklar
-  & "{py}" "{helper}" type "metin" [--element <numara|ad>] [--enter]
-  & "{py}" "{helper}" keys "ctrl+l"                   tuşlar; birkaç kombinasyon boşlukla ayrılır
-  & "{py}" "{helper}" shot [--window AD]              ekran görüntüsü alır ve PNG yolunu yazar; Read ile bak
+  & {py} "{helper}" windows                         açık pencereler, en öndeki ilk
+  & {py} "{helper}" read [--window AD]              penceredeki düğme, alan ve bağlantılar, numaralı
+  & {py} "{helper}" click <numara|ad>               son okunan listedeki bir öğeye tıklar
+  & {py} "{helper}" type "metin" [--element <numara|ad>] [--enter]
+  & {py} "{helper}" keys "ctrl+l"                   tuşlar; birkaç kombinasyon boşlukla ayrılır
+  & {py} "{helper}" shot [--window AD]              ekran görüntüsü alır ve PNG yolunu yazar; Read ile bak
 
 Çalışma şekli: önce read ile bak, bir adım yap, sonra read (gerekirse shot) ile sonucu doğrula. Liste boşsa ya da
 yetersizse shot al ve görüntüye bakarak karar ver. Program açman gerekirse Start-Process kullan.
@@ -189,8 +189,8 @@ class ClaudeJobs:
             lesson = line(text, "DERS") if ok else ""
             ok, text, job.skill = self._learned(ok, text)
         elif job.kind == "screen":
-            helper = self.project_dir / "backend" / "scripts" / "screen.py"
-            prompt = SCREEN.format(task=job.task, py=sys.executable, helper=helper, lessons=lessons)
+            helper = RESOURCE_DIR / "backend" / "scripts" / "screen.py"
+            prompt = SCREEN.format(task=job.task, py=python_ps(), helper=helper, lessons=lessons)
             ok, text = await asyncio.to_thread(self._run, prompt, self.workdir, ALLOWED, DISALLOWED)
             if ok:
                 lesson = line(text, "DERS")

@@ -5,7 +5,7 @@ import logging
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 
-from .config import ROOT_DIR, get_settings
+from .config import RESOURCE_DIR, get_settings
 from .routers import dev, events, token, tools
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -49,4 +49,4 @@ async def health() -> dict[str, str]:
 
 # The PWA is served from the same origin, so the phone needs only one address
 # (`tailscale serve` → this app) and no CORS.
-app.mount("/", StaticFiles(directory=ROOT_DIR / "frontend", html=True), name="frontend")
+app.mount("/", StaticFiles(directory=RESOURCE_DIR / "frontend", html=True), name="frontend")

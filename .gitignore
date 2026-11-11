@@ -39,3 +39,8 @@ backend/gmail-client.json
 
 # Impeccable design detector cache
 .impeccable/hook.cache.json
+
+# PyInstaller output (packaging/build.ps1)
+/build/
+/dist/
+packaging/mario.ico

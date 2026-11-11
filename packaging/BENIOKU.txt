@@ -1,0 +1,29 @@
+MARIO - sesle komut alan kişisel asistan
+=========================================
+
+KURULUM
+1. Bu klasörü istediğin bir yere koy (ör. Belgeler\Mario). Zip'in içinden çalıştırma; önce çıkar.
+2. Mario.exe'ye çift tıkla.
+   Windows "Windows bilgisayarınızı korudu" derse: "Ek bilgi" > "Yine de çalıştır".
+   (Uygulama imzalı değil; bu uyarı o yüzden çıkıyor.)
+3. İlk açılışta bir pencere Gemini API anahtarı ister. "Anahtar al" düğmesine bas,
+   Google hesabınla gir, "Create API key"e bas, anahtarı kopyalayıp yapıştır. Ücretsizdir.
+4. Mario tarayıcıda (Chrome ya da Edge) uygulama penceresi olarak açılır.
+   "Başlat"a bas, mikrofona izin ver ve konuş: "Saat kaç?", "Not defterini aç",
+   "İzmir'de hava nasıl?", "10 dakika sonra çayı hatırlat".
+
+KULLANIM
+- Mario saatin yanındaki simgelerde (tepsi) durur. Simgeye sağ tıkla:
+  "Mario'yu aç", "Windows açılınca başlat", "Ayarlar", "Çıkış".
+- Pencereyi kapatsan da Mario arka planda çalışır. Kapatmak için tepsi > Çıkış.
+- Bilgisayarı kapatma, e-posta gönderme gibi işler önce sesli onay ister.
+
+AYARLAR VE VERİLER
+- Ayarlar, notlar, öğrenilen yetenekler: %LOCALAPPDATA%\Mario
+  (tepsi > "Mario klasörünü aç"). Ayarı değiştirince Mario'yu kapatıp yeniden aç.
+- Kaldırmak için: tepsi > Çıkış, bu klasörü ve %LOCALAPPDATA%\Mario klasörünü sil.
+
+İSTEĞE BAĞLI
+- Yeni yetenek öğrenme ve "Claude'a yaptır" komutları için Claude Code kurulu ve
+  giriş yapılmış olmalı (https://claude.com/claude-code).
+- Gmail ve Google Takvim bağlamak şimdilik yalnızca kaynak koddan kurulumla yapılabiliyor.

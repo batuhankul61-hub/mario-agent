@@ -3,7 +3,7 @@ from functools import lru_cache
 
 from fastapi import Depends, Header, HTTPException, Request
 
-from .config import ROOT_DIR, Settings, get_settings
+from .config import USER_DIR, Settings, get_settings
 from .confirm import PendingActions
 from .gemini import GeminiService
 from .tools import Context
@@ -39,7 +39,7 @@ def get_context() -> Context:
         s.claude_timeout_minutes,
         s.audit_log,
         s.dry_run,
-        project_dir=ROOT_DIR,
+        project_dir=USER_DIR,
         skills_dir=s.skills_dir,
         embedder_factory=_embedder_factory(s),
     )

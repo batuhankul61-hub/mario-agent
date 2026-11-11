@@ -233,6 +233,26 @@ Dürüst not: Korpus küçük ve sentetik (12 belge, 33 belge parçası + 4 not)
 
 ## Kurulum
 
+### Hazır sürüm (Mario.exe)
+
+Python ya da başka bir şey kurmadan kullanmak için [Releases](../../releases) sayfasından `Mario-<sürüm>-windows.zip` dosyasını indir, bir klasöre çıkar ve **`Mario.exe`**'ye çift tıkla.
+
+* İlk açılışta küçük bir pencere ücretsiz Gemini API anahtarını ister (bağlantısı pencerede). Anahtar `%LOCALAPPDATA%\Mario\.env` dosyasına yazılır.
+* Mario Chrome ya da Edge'de uygulama penceresi olarak açılır ve saatin yanındaki tepside durur. Tepsi menüsünde "Mario'yu aç", "Windows açılınca başlat", "Ayarlar", "Mario klasörünü aç" ve "Çıkış" var.
+* Notlar, öğrenilen yetenekler, hatırlatmalar ve günlük `%LOCALAPPDATA%\Mario` altında durur; exe klasörüne bir şey yazılmaz.
+* Exe imzalı olmadığı için Windows SmartScreen uyarı verebilir: "Ek bilgi" → "Yine de çalıştır".
+* Öğrenme ve "Claude'a yaptır" için Claude Code ayrıca kurulu olmalı. Gmail ve Takvim bağlamak şimdilik yalnızca kaynak koddan kurulumla yapılıyor.
+
+Exe'yi kendin derlemek için:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File packaging\build.ps1
+```
+
+Çıktı `dist\Mario\` klasörü ve paylaşılacak `dist\Mario-<sürüm>-windows.zip` dosyasıdır. GitHub'a `v*` etiketi push edilince [release.yml](.github/workflows/release.yml) aynı zip'i derleyip sürüme ekler. Exe, PyInstaller'ın klasör derlemesidir (tek dosya değil): öğrenilmiş Python yeteneklerini `Mario.exe python run.py` ile kendi yorumlayıcısında çalıştırır ve tek dosyalık exe bunu her seferinde `%TEMP%`'e açmak zorunda kalırdı.
+
+### Kaynak koddan
+
 Gereken: Windows, [uv](https://docs.astral.sh/uv/) (Python 3.12'yi kendisi kurar), Chrome/Edge. Claude'a iş devretmek için Claude Code kurulu ve giriş yapılmış olmalı.
 
 ```powershell
@@ -326,6 +346,7 @@ backend/
     agents/           hub-and-spoke: ADK hafıza araştırmacısı
     confirm.py        bekleyen işler + "evet" kontrolü
     audit.py          audit.jsonl
+    desktop.py        Mario.exe başlatıcısı: ilk kurulum penceresi, tepsi simgesi, sunucu
     reminders.py      hatırlatma deposu ve zaman çözümleme
     scheduler.py      arka plan döngüsü: hatırlatma, yeni e-posta, takvim, pil → events.py
     notify.py         Windows bildirimi (PowerShell WinRT)
@@ -338,6 +359,7 @@ backend/
   evals/              sabit korpus, 40 soru, run_eval.py (retrieval + LLM-as-judge), baseline.json;
                       tool_cases.jsonl + run_tool_eval.py (araç seçimi), tool_baseline.json
   tests/
+packaging/            Mario.exe: mario_exe.py (giriş), mario.spec (PyInstaller), build.ps1, BENIOKU.txt
 frontend/             PWA: live.js, audio/ (Lucia'dan), transcript.js, session.js, app.js, wake.js
 programs/             open_program'ın önce baktığı kısayollar
 notes/                Mario'nun hatırlayacağı belgeler (kişisel, git'e girmez)

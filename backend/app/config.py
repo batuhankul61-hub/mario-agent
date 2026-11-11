@@ -1,6 +1,7 @@
 """Runtime settings, read from environment variables or backend/.env."""
 
 import os
+import sys
 from functools import lru_cache
 from pathlib import Path
 
@@ -9,7 +10,28 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 ROOT_DIR = BACKEND_DIR.parent
-ENV_FILE = BACKEND_DIR / ".env"
+
+# Mario.exe (PyInstaller, see packaging/): the files that ship with it are read
+# from the bundle, the user's own (.env, data, skills, notes) from %LOCALAPPDATA%.
+FROZEN = bool(getattr(sys, "frozen", False))
+if FROZEN:
+    RESOURCE_DIR = Path(getattr(sys, "_MEIPASS", Path(sys.executable).parent))
+    USER_DIR = Path(os.environ.get("LOCALAPPDATA") or Path.home()) / "Mario"
+    STATE_DIR = USER_DIR
+else:
+    RESOURCE_DIR = ROOT_DIR  # frontend/, backend/scripts, backend/skill_lib, .claude/
+    USER_DIR = ROOT_DIR  # skills/, notes/, programs/, claude-workspace/
+    STATE_DIR = BACKEND_DIR  # .env, data/, gmail-client.json
+ENV_FILE = STATE_DIR / ".env"
+
+# How to run a Python file: Mario.exe has no python.exe beside it, so it runs
+# scripts itself (`Mario.exe python script.py`, see packaging/mario_exe.py).
+PYTHON = [sys.executable, "python"] if FROZEN else [sys.executable]
+
+
+def python_ps() -> str:
+    """PYTHON as a PowerShell call target, for prompts: `& <this> script.py`."""
+    return " ".join([f'"{PYTHON[0]}"', *PYTHON[1:]])
 
 
 def _default_claude_path() -> str:
@@ -49,21 +71,21 @@ class Settings(BaseSettings):
 
     # Folder of shortcuts (.lnk/.url/.bat/.exe) that open_program searches
     # first; the Start Menu is searched after it.
-    programs_dir: Path = ROOT_DIR / "programs"
-    screenshot_script: Path = BACKEND_DIR / "scripts" / "screenshot.ps1"
+    programs_dir: Path = USER_DIR / "programs"
+    screenshot_script: Path = RESOURCE_DIR / "backend" / "scripts" / "screenshot.ps1"
 
     claude_path: str = Field(default_factory=_default_claude_path)
-    claude_workdir: Path = ROOT_DIR / "claude-workspace"
+    claude_workdir: Path = USER_DIR / "claude-workspace"
     claude_timeout_minutes: int = 15
 
     # Skills Claude Code taught Mario (see app/tools/skills.py).
-    skills_dir: Path = ROOT_DIR / "skills"
+    skills_dir: Path = USER_DIR / "skills"
 
-    data_dir: Path = BACKEND_DIR / "data"
+    data_dir: Path = STATE_DIR / "data"
 
     # Long-term memory (app/memory): notes said by voice, documents from this
     # folder (pdf/md/txt) and, on request, recent Gmail messages.
-    memory_docs_dir: Path = ROOT_DIR / "notes"
+    memory_docs_dir: Path = USER_DIR / "notes"
     embedding_model: str = "gemini-embedding-001"
     embedding_dim: int = 768
     # Text model of the specialist agents (app/agents). Lite: a spoken turn waits
@@ -78,7 +100,7 @@ class Settings(BaseSettings):
     chunk_overlap: int = 80
 
     # OAuth client of type "Desktop app" from Google Cloud Console; see README.
-    gmail_client_file: Path = BACKEND_DIR / "gmail-client.json"
+    gmail_client_file: Path = STATE_DIR / "gmail-client.json"
 
     # Things Mario says first (app/scheduler.py): due reminders always; new
     # primary-inbox mail and calendar events about to start when Google is

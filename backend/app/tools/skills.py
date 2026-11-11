@@ -29,13 +29,12 @@ import os
 import re
 import shutil
 import subprocess
-import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from ..config import BACKEND_DIR, Settings
+from ..config import PYTHON, RESOURCE_DIR, Settings
 
-SKILL_LIB = BACKEND_DIR / "skill_lib"
+SKILL_LIB = RESOURCE_DIR / "backend" / "skill_lib"
 
 log = logging.getLogger(__name__)
 
@@ -183,7 +182,7 @@ def _command(skill: Skill) -> list[str]:
         ]
     # -I: isolated mode, so the skill folder can't shadow standard modules. It also ignores
     # PYTHONIOENCODING, hence -X utf8 for the Turkish text on stdin/stdout.
-    return [sys.executable, "-I", "-X", "utf8", str(skill.entry)]
+    return [*PYTHON, "-I", "-X", "utf8", str(skill.entry)]
 
 
 def _execute(skill: Skill, args: dict) -> subprocess.CompletedProcess:
