@@ -61,6 +61,29 @@ async def test_token_locks_prompt_and_every_tool():
     assert "confirm_action" in live.config.system_instruction
 
 
+def test_resume_handle_reaches_the_token(client, fake_gemini):
+    assert client.post("/api/token", json={"resume_handle": "abc-123_x"}).status_code == 200
+    assert fake_gemini.resume_handle == "abc-123_x"
+    assert client.post("/api/token").status_code == 200
+    assert fake_gemini.resume_handle is None
+
+
+def test_bad_resume_handle_is_rejected(client):
+    assert client.post("/api/token", json={"resume_handle": 'a b"c'}).status_code == 422
+
+
+async def test_token_enables_resumption_and_compression():
+    service = GeminiService(Settings(_env_file=None, gemini_api_key="k"))
+    fake = FakeTokens()
+    service._client = type("C", (), {"aio": type("A", (), {"auth_tokens": fake})()})()
+
+    await service.create_live_token(resume_handle="h1")
+
+    live = fake.config.live_connect_constraints.config
+    assert live.session_resumption.handle == "h1"
+    assert live.context_window_compression.sliding_window is not None
+
+
 def test_google_search_is_opt_in():
     settings = Settings(_env_file=None, gemini_api_key="k", enable_google_search=True)
     tools = GeminiService(settings).live_config().tools

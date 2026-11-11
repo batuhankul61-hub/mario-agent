@@ -40,10 +40,12 @@ async function request(method, path, body) {
   return data;
 }
 
-export const createToken = () => request("POST", "/api/token", {});
+export const createToken = (resumeHandle = null) =>
+  request("POST", "/api/token", resumeHandle ? { resume_handle: resumeHandle } : {});
 export const runTool = (name, args, utterances = []) => request("POST", "/api/tool", { name, args, utterances });
 export const devSkills = () => request("GET", "/api/dev/skills");
 export const answerConfirmation = (id, approved) => request("POST", `/api/confirm/${encodeURIComponent(id)}`, { approved });
+export const listEvents = (after) => request("GET", `/api/events?after=${after}`);
 export const jobStatus = (id) => request("GET", `/api/jobs/${encodeURIComponent(id)}`);
 
 /** Screenshots need the access-code header, which <img src> can't send. */

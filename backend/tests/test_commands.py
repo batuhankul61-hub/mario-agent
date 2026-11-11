@@ -71,6 +71,29 @@ async def test_unknown_program(settings, programs):
     assert programs == []
 
 
+REAL_PROGRAM_FILES = system.program_files  # before conftest stubs it for each test
+
+
+async def test_falls_back_to_installed_programs(settings, programs, monkeypatch):
+    # e.g. AnyDesk installed by winget: no Start Menu shortcut.
+    monkeypatch.setattr(system, "start_apps", lambda w: "shell:AppsFolder\\AnyDesk.App")
+    res = await system.open_program("AnyDesk", settings)
+    assert res["status"] == "ok" and res["message"] == "AnyDesk açıldı."
+    assert programs == ["shell:AppsFolder\\AnyDesk.App"]
+
+
+def test_program_files_scan(tmp_path, monkeypatch):
+    app = tmp_path / "PF" / "AnyDesk"
+    app.mkdir(parents=True)
+    (app / "AnyDesk.exe").write_text("")
+    (app / "uninstall.exe").write_text("")
+    for var in ("ProgramFiles", "ProgramFiles(x86)", "ProgramW6432", "LOCALAPPDATA"):
+        monkeypatch.delenv(var, raising=False)
+    monkeypatch.setenv("ProgramFiles", str(tmp_path / "PF"))
+    assert REAL_PROGRAM_FILES("anydesk") == str(app / "AnyDesk.exe")
+    assert REAL_PROGRAM_FILES("photoshop") is None
+
+
 async def test_dry_run_opens_nothing(settings, programs):
     settings.dry_run = True
     res = await system.open_program("flo desk", settings)
@@ -101,7 +124,7 @@ def ran(monkeypatch):
 
 
 async def test_screenshot_returns_path_and_url(settings, ran):
-    path = r"C:\Users\Batu\Pictures\Screenshots\Ekran görüntüsü 2026-11-03 101500.png"
+    path = r"C:\Users\Ada\Pictures\Screenshots\Ekran görüntüsü 2026-11-03 101500.png"
     ran.result.stdout = f"Ekranın görüntüsü alındı ve kaydedildi: {path}\n"
     res = await system.take_screenshot("", settings)
     assert res["status"] == "ok"

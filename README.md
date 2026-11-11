@@ -14,6 +14,15 @@ Mario, Windows bilgisayarında çalışan, Jarvis tarzı bir sesli ajandır. Tar
 | `delegate_to_claude` 🔒 | "Claude'a README'yi güncellet" | **Sesli onaydan sonra** görevi arka planda `claude -p`'ye verir; bitince Mario haber verir |
 | `check_claude_task` | "Claude'un işi bitti mi?" | Görevin durumunu ve sonucunu okur |
 
+**Hatırlatma ve takvim**
+
+| Komut | Örnek | Ne yapar |
+|---|---|---|
+| `set_reminder` | "10 dakika sonra çayı hatırlat", "yarın 9'da kirayı hatırlat", "5 dakikalık zamanlayıcı kur" | `backend/data/reminders.json`'a yazar; zamanı gelince Mario söyler ve Windows bildirimi çıkar |
+| `list_reminders` | "Hangi hatırlatmalarım var?" | Bekleyenleri numaralarıyla sayar |
+| `cancel_reminder` | "2 numaralı hatırlatmayı iptal et" | Bekleyen hatırlatmayı siler |
+| `list_calendar_events` | "Bugün neyim var?", "Bu hafta toplantım var mı?" | Google Takvim'i okur (yalnızca okuma; Gmail girişiyle birlikte bağlanır) |
+
 **PC ayarları**
 
 | Komut | Örnek | Ne yapar |
@@ -31,6 +40,9 @@ Mario, Windows bilgisayarında çalışan, Jarvis tarzı bir sesli ajandır. Tar
 | `sleep_computer` 🔒 | "Bilgisayarı uyut" | Cevap tarayıcıya ulaşsın diye 2 sn sonra uyku |
 | `list_programs` | "Hangi programlar açık?" | Görünür pencereler |
 | `close_program` 🔒 | "Discord'u kapat" | Normal kapatma isteği gönderir (`/F` yok), böylece program kaydetmeyi sorabilir. Windows'un kendi süreçlerine ve Mario'ya dokunmaz |
+| `scan_network` | "Ağdaki bilgisayarları göster" | Yerel ağdaki her adrese boş bir UDP paketi gönderir (böylece açık her cihaz ARP tablosuna düşer), sonra `Get-NetNeighbor` ile cihazları ve adlarını numaralı sayar ve hangisini istediğini sorar. Modem ve bu bilgisayar listede çıkmaz |
+| `save_wake_device` | "2 numarayı masaüstü diye kaydet" | Taranan cihazın MAC adresini `backend/data/wol_devices.json`'a kaydeder. Kapalı cihaz ağda görünmediği için onu bir kez açıkken kaydetmek gerekir |
+| `wake_device` | "Masaüstünü aç", "sunucuyu uyandır", "3 numarayı uyandır" | Wake-on-LAN sihirli paketi gönderir. Yalnızca kayıtlı cihazlar, `.env`'deki `WOL_DEVICES` (`{"masaüstü": "AA:BB:CC:DD:EE:FF"}`) ya da son taramadaki cihazlar; MAC adresini model veremez. Hedef cihazda BIOS'ta ve ağ kartında WoL açık olmalı |
 
 **Gmail**
 
@@ -65,6 +77,31 @@ Mario, Windows bilgisayarında çalışan, Jarvis tarzı bir sesli ajandır. Tar
 
 🔒 işaretli araçlar onay ister.
 
+## Oturum kopmaz
+
+Live oturumu iki şeyle açılır: **bağlam sıkıştırma** (`context_window_compression`, kayan pencere) ve **oturum devamı** (`session_resumption`). Sunucu konuşma boyunca devam anahtarları (handle) gönderir; tarayıcı en sonuncuyu saklar. Şu durumlarda Mario sesini kesmeden yeni bir bağlantıya geçer:
+
+* Google bağlantıyı kapatacağını bildirdiğinde (`goAway`),
+* token'ın ömrü dolmadan bir dakika önce,
+* bağlantı beklenmedik biçimde koptuğunda (ağ, telefon uykusu; 4 deneme, artan bekleme).
+
+Yeni token `POST /api/token`'a `resume_handle` ile istenir. Sistem talimatı ve araç listesi yine sunucuda kilitlenir; handle yalnızca hangi konuşmanın süreceğini seçer. Geçiş sırasında gelen sistem notları ve yazılan komutlar kuyrukta bekler, yarım kalan araç sonuçları önce teslim edilir. Tarayıcıda gerçek bir oturumla denendi: bağlantı zorla koparıldıktan sonra Mario konuşmadaki ilk cümleyi aynen tekrarladı.
+
+## Kendiliğinden haber verir
+
+`app/scheduler.py` arka planda çalışan bir döngüdür. Şunları olay olarak kuyruğa koyar ve ayrıca Windows bildirimi gösterir:
+
+* zamanı gelen hatırlatma ve zamanlayıcılar (5 sn'de bir bakar),
+* gelen kutusunun "Birincil" sekmesine düşen yeni e-postalar (Gmail bağlıysa, 5 dk'da bir; ilk bakışta var olanları yalnızca hatırlar),
+* 15 dakika içinde başlayacak takvim etkinlikleri (Google bağlıysa),
+* şarja takılı değilken yüzde 20'nin altına düşen pil.
+
+Açık sayfa `GET /api/events`'i 5 sn'de bir okur. Ses oturumu açıksa olay Mario'ya sistem notu olarak gider ve Mario söyler. E-posta ve takvim metni `untrusted_content` olarak işaretlenir, yani yalnızca okunur. Hepsi `.env`'den kapatılabilir (`NOTIFY_MAIL`, `NOTIFY_CALENDAR`, `NOTIFY_BATTERY_PERCENT=0`, `TOAST_NOTIFICATIONS`).
+
+## "Mario" deyince başlar
+
+Ayarlar'daki **"Mario" deyince başla** açıksa, oturum kapalıyken sayfa Chrome'un konuşma tanımasıyla adını bekler. "Mario, saat kaç?" denince oturum açılır ve cümlenin geri kalanı ilk komut olur; yalnızca "Mario" denirse selam verir. Bu yolla açılan oturum 60 sn sessiz kalınca kendiliğinden kapanır (onay ya da Claude görevi beklerken kapanmaz) ve sayfa yeniden adını beklemeye döner. Gemini Live yalnızca adından sonra çalışır. Not: Chrome'un konuşma tanıması sesi Google'ın sunucularına gönderir; ayar bu yüzden varsayılan olarak kapalıdır.
+
 ## Bilmediğini öğrenir
 
 Mario bir isteği hiçbir araçla yapamıyorsa "bilmiyorum" demez:
@@ -80,6 +117,12 @@ Mario bir isteği hiçbir araçla yapamıyorsa "bilmiyorum" demez:
 4. Tarayıcı işin bittiğini görünce Mario'ya yeni yeteneği anlatan bir sistem notu gönderir. Mario öğrendiğini söyler ve ilk isteği hemen `run_skill` ile yapar.
 
 Live token'ı araç listesini kilitlediği için her yetenek ayrı bir fonksiyon olarak tanımlanmaz. Hepsi tek bir `run_skill` aracından geçer ve yetenekler her çağrıda diskten okunur. Böylece aynı sesli oturum içinde öğrenilen bir yetenek de hemen kullanılabilir. Sonraki oturumlarda yetenekler sistem talimatında listelenir.
+
+**Yetenek sağlığı:** Her `run_skill` çalışması `backend/data/skill-health.json` dosyasına sayılır (çalışma, hata, art arda hata, son hata). Bir yetenek üst üste 3 kez başarısız olursa sonuçta `needs_repair` döner ve Mario, Claude'un onarmasını isteyip istemediğini sorar. `list_skills` hep başarısız olanları da söyler. `.ps1` yeteneklerinde başarıyı yalnızca son satır belirler, çünkü betik `exit` ile bitmezse çıkış kodu içeride son çalışan programdan kalır. Örneğin `program_kur`, AnyDesk kurulumu başarıyla başladığı halde bu yüzden "hata" olarak kaydediliyordu.
+
+**Ortak yardımcılar:** Yetenekler `MARIO_LIB` ortam değişkeniyle `backend/skill_lib/` klasörünü görür. `window.ps1` içindeki `Set-MarioForeground`, Windows'un ön plan kilidini aşarak bir pencereyi öne getirir ve gerçekten öne geldiğini kontrol eder. "Pencere öne getirilemedi" hatası WhatsApp ve ekran paylaşma yeteneklerinde bu yüzden çıkıyordu. mario-yetenek skill'i Claude'a bu yardımcıyı kullanmasını söyler.
+
+**Deneyim hafızası:** Claude bir işi bitirince yazdığı ders (`data/experience.jsonl`), benzer bir sonraki işin istemine eklenir. Benzer dersler Gemini embedding'leriyle, yani anlamca bulunur ("Mehmet'e yaz" isteği, ortak kelime olmasa da WhatsApp mesajı dersini bulur). Vektörler `experience.vectors.npz` dosyasında önbelleklenir. Anahtar ya da ağ yoksa kelime örtüşmesine düşer.
 
 Güvenlik: öğrenme her seferinde senin sesli onayını ister. Claude yalnızca `skills/` altına yazabilir (`backend/`, `frontend/` ve `.claude/` yazma izinleri kapalı) ve yıkıcı komutlar yasak. Yıkıcı bir yeteneğin her çalıştırılması da ayrıca sesli onaydan geçer.
 
@@ -155,7 +198,7 @@ flowchart LR
 
 ## Değerlendirme (eval)
 
-`backend/evals/` altında küçük, sabit bir korpus var: 12 kurgusal kişisel belge (kira, araba, sağlık, iş projesi, tatil...) ve 4 not. Benzer konulu çeldirici belgeler (eski evin kira sözleşmesi, babanın arabası) bilerek eklendi. Soru seti `questions.jsonl` 40 sorudan oluşur: 36'sının cevabı hafızada var, 4'ününki yok (bu sorularda model uydurmak yerine "bilmiyorum" demeli).
+`backend/evals/` altında küçük, sabit bir korpus var: 12 kurgusal kişisel belge (kira, araba, sağlık, iş projesi, tatil...) ve 4 not; içlerindeki kişiler, adresler ve rakamlar uydurmadır. Benzer konulu çeldirici belgeler (eski evin kira sözleşmesi, babanın arabası) bilerek eklendi. Soru seti `questions.jsonl` 40 sorudan oluşur: 36'sının cevabı hafızada var, 4'ününki yok (bu sorularda model uydurmak yerine "bilmiyorum" demeli).
 
 ```powershell
 cd backend
@@ -195,7 +238,7 @@ Gereken: Windows, [uv](https://docs.astral.sh/uv/) (Python 3.12'yi kendisi kurar
 ```powershell
 cd backend
 uv sync
-copy .env.example .env      # GEMINI_API_KEY'i doldur
+copy .env.example .env      # GEMINI_API_KEY'i doldur; istersen USER_NAME ile adını da yaz
 uv run uvicorn app.main:app --host 127.0.0.1 --port 8100
 ```
 
@@ -225,7 +268,8 @@ Kendi programlarının kısayollarını `programs/` klasörüne koy ya da `.env`
 1. [Google Cloud Console](https://console.cloud.google.com/)'da bir proje aç ve **Gmail API**'yi etkinleştir.
 2. *OAuth consent screen*: tür **External**, kendini *Test users* listesine ekle.
 3. *Credentials → Create credentials → OAuth client ID*: tür **Desktop app**. JSON dosyasını indir ve `backend/gmail-client.json` olarak kaydet (git'e girmez).
-4. `cd backend` ve `uv run python scripts/gmail_login.py`. Tarayıcı açılır, hesabını seçersin. İzinler yalnızca **okuma** ve **gönderme**: silme, arşivleme ya da etiketleme yok.
+4. *Google Calendar API*'yi de etkinleştir (takvim için).
+5. `cd backend` ve `uv run python scripts/gmail_login.py`. Tarayıcı açılır, hesabını seçersin. İzinler yalnızca Gmail **okuma** ve **gönderme**, bir de takvim **okuma**: silme, arşivleme, etiketleme ya da takvime yazma yok. Gmail'i daha önce bağladıysan takvim izni için bu adımı bir kez daha yap.
 
 Token `backend/data/gmail-token.json` dosyasında durur. Bağlantıyı kesmek için bu dosyayı sil.
 
@@ -282,15 +326,25 @@ backend/
     agents/           hub-and-spoke: ADK hafıza araştırmacısı
     confirm.py        bekleyen işler + "evet" kontrolü
     audit.py          audit.jsonl
-    routers/          /api/token, /api/tool, /api/confirm, /api/jobs, /api/audit, /api/screenshots
+    reminders.py      hatırlatma deposu ve zaman çözümleme
+    scheduler.py      arka plan döngüsü: hatırlatma, yeni e-posta, takvim, pil → events.py
+    notify.py         Windows bildirimi (PowerShell WinRT)
+    experience.py     Claude işlerinden kalan dersler (embedding ile arama)
+    routers/          /api/token, /api/tool, /api/confirm, /api/jobs, /api/audit, /api/screenshots, /api/events
+  skill_lib/          yeteneklerin ortak yardımcıları (window.ps1: pencereyi öne getirme)
   scripts/            screenshot.ps1, live_smoke.py, gmail_login.py,
                       start-mario.ps1 + serve.py + install-shortcuts.ps1 (başlatma),
                       check_skill.py (yetenek doğrulama)
-  evals/              sabit korpus, 40 soru, run_eval.py (retrieval + LLM-as-judge), baseline.json
+  evals/              sabit korpus, 40 soru, run_eval.py (retrieval + LLM-as-judge), baseline.json;
+                      tool_cases.jsonl + run_tool_eval.py (araç seçimi), tool_baseline.json
   tests/
-frontend/             PWA: live.js, audio/ (Lucia'dan), transcript.js, session.js, app.js
+frontend/             PWA: live.js, audio/ (Lucia'dan), transcript.js, session.js, app.js, wake.js
 programs/             open_program'ın önce baktığı kısayollar
 notes/                Mario'nun hatırlayacağı belgeler (kişisel, git'e girmez)
 skills/               Mario'nun öğrendiği yetenekler (kişisel, git'e girmez)
 .claude/skills/       mario-yetenek: Claude'un Mario'ya yetenek öğretirken izlediği skill
 ```
+
+## Lisans
+
+[MIT](LICENSE)

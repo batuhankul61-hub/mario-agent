@@ -7,11 +7,12 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from ..config import Settings
-from . import claude, gmail, knowledge, pc, screen, skills, system, web
+from . import claude, gcalendar, gmail, knowledge, pc, remind, screen, skills, system, web, wol
 
 if TYPE_CHECKING:
     from ..agents import MemoryResearcher
     from ..memory import Memory
+    from ..reminders import Reminders
 
 Result = dict[str, Any]
 
@@ -23,6 +24,7 @@ class Context:
     # Built on first use by tools/knowledge.py; tests pass ones with fake models.
     memory: "Memory | None" = None
     researcher: "MemoryResearcher | None" = None
+    reminders: "Reminders | None" = None
 
 
 @dataclass(frozen=True)
@@ -127,6 +129,41 @@ TOOLS: dict[str, Tool] = {
             "get_time",
             "Bu bilgisayardaki şu anki tarih ve saati verir.",
             lambda a, c: web.get_time(),
+        ),
+        # ---------- reminders, calendar ----------
+        Tool(
+            "set_reminder",
+            "Hatırlatma ya da zamanlayıcı kurar ('10 dakika sonra çayı hatırlat', 'yarın 9'da kirayı hatırlat', "
+            "'5 dakikalık zamanlayıcı kur'). Zamanı geldiğinde Mario söyler ve bildirim çıkar. in_minutes ya da "
+            "at'ten birini ver.",
+            remind.set_reminder,
+            {
+                "text": _str("Hatırlatılacak şey, kısa ve anlaşılır."),
+                "in_minutes": _int("Şimdiden kaç dakika sonra."),
+                "at": _str(
+                    "Yerel saat: bugün/yarın için 'SS:DD' (geçmişte kalırsa yarın), başka gün için "
+                    "'YYYY-AA-GGTSS:DD'. Tarihi bilmiyorsan önce get_time çağır."
+                ),
+                "kind": _str("Hatırlatma mı zamanlayıcı mı.", ["reminder", "timer"]),
+            },
+        ),
+        Tool(
+            "list_reminders",
+            "Bekleyen hatırlatmaları ve zamanlayıcıları numaralarıyla listeler.",
+            remind.list_reminders,
+        ),
+        Tool(
+            "cancel_reminder",
+            "Bekleyen bir hatırlatmayı ya da zamanlayıcıyı iptal eder.",
+            remind.cancel_reminder,
+            {"id": _int("Hatırlatmanın numarası (list_reminders'tan).")},
+            ("id",),
+        ),
+        Tool(
+            "list_calendar_events",
+            "Google Takvim'deki etkinlikleri okur ('bugün neyim var?', 'bu hafta toplantım var mı?').",
+            lambda a, c: gcalendar.list_events(a, c.settings),
+            {"days": _int("Bugünden başlayarak kaç gün (1-14). Varsayılan 1, yani bugün.")},
         ),
         Tool(
             "delegate_to_claude",
@@ -338,6 +375,35 @@ TOOLS: dict[str, Tool] = {
             confirm=lambda a: (
                 f"{a.get('name', '')} kapatılsın mı? Kaydedilmemiş işler kaybolabilir."
             ),
+        ),
+        Tool(
+            "scan_network",
+            "Yerel ağı tarayıp açık bilgisayar ve cihazları numaralı listeler (ad, IP). Kullanıcı ağdaki "
+            "cihazları sorduğunda ya da uyandırmak istediği cihaz kayıtlı değilse çağır; listeyi okuyup "
+            "hangisi olduğunu sor. Kapalı cihazlar listede çıkmaz.",
+            _with_settings(wol.scan_network),
+        ),
+        Tool(
+            "save_wake_device",
+            "scan_network listesindeki bir cihazı bir adla kaydeder; böylece kapalıyken de wake_device ile "
+            "uyandırılabilir.",
+            _with_settings(wol.save_wake_device),
+            {
+                "number": _int("Cihazın scan_network listesindeki numarası."),
+                "name": _str("Kullanıcının verdiği ad, ör. 'masaüstü'. Boşsa cihazın ağdaki adı."),
+            },
+            ("number",),
+        ),
+        Tool(
+            "wake_device",
+            "Yerel ağdaki bir bilgisayarı ya da cihazı Wake-on-LAN ile uyandırır/açar ('masaüstünü aç', "
+            "'sunucuyu uyandır'). Kayıtlı bir ad ya da son scan_network listesinden bir numara ver; ikisi de "
+            "boşsa kayıtlı cihazları sayar.",
+            _with_settings(wol.wake_device),
+            {
+                "name": _str("Kayıtlı cihazın adı, ör. 'masaüstü'."),
+                "number": _int("Son scan_network listesindeki numara."),
+            },
         ),
         # ---------- Gmail ----------
         Tool(

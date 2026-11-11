@@ -25,6 +25,7 @@ import asyncio
 import datetime as dt
 import json
 import logging
+import os
 import re
 import shutil
 import subprocess
@@ -32,7 +33,9 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from ..config import Settings
+from ..config import BACKEND_DIR, Settings
+
+SKILL_LIB = BACKEND_DIR / "skill_lib"
 
 log = logging.getLogger(__name__)
 
@@ -174,7 +177,9 @@ def _command(skill: Skill) -> list[str]:
             "Bypass",
             "-Command",
             "[Console]::InputEncoding = [Console]::OutputEncoding = New-Object Text.UTF8Encoding $false; "
-            f"& '{path}'; exit $LASTEXITCODE",
+            # A terminating error becomes a "Hata:" line, the protocol's failure signal.
+            f"try {{ & '{path}' }} catch {{ Write-Output ('Hata: ' + $_.Exception.Message); exit 1 }}; "
+            "exit $LASTEXITCODE",
         ]
     # -I: isolated mode, so the skill folder can't shadow standard modules. It also ignores
     # PYTHONIOENCODING, hence -X utf8 for the Turkish text on stdin/stdout.
@@ -186,6 +191,9 @@ def _execute(skill: Skill, args: dict) -> subprocess.CompletedProcess:
         _command(skill),
         input=json.dumps(args, ensure_ascii=False),
         cwd=skill.folder,
+        # MARIO_LIB: shared helpers (backend/skill_lib), e.g. window.ps1 for
+        # bringing a window to the front reliably.
+        env={**os.environ, "MARIO_LIB": str(SKILL_LIB)},
         capture_output=True,
         text=True,
         encoding="utf-8",
@@ -209,13 +217,65 @@ async def run_skill(args: dict, settings: Settings) -> dict:
         return {"status": "error", "message": f"Eksik bilgi: {', '.join(missing)}."}
     if settings.dry_run:
         return {"status": "ok", "message": f"(deneme) {name} yeteneği çalışacaktı."}
+    result = await _run(skill, skill_args)
+    streak = record_health(settings.data_dir / HEALTH_FILE, name, result)
+    if result["status"] == "error" and streak >= REPAIR_AFTER:
+        result["needs_repair"] = True
+        result["message"] += (
+            f" Bu yetenek üst üste {streak} kez başarısız oldu; kullanıcıya Claude'un onarmasını "
+            "isteyip istemediğini sor."
+        )
+    return result
+
+
+HEALTH_FILE = "skill-health.json"
+# Failures in a row before Mario offers to have Claude repair the skill.
+REPAIR_AFTER = 3
+
+
+def load_health(path: Path) -> dict[str, dict]:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def record_health(path: Path, name: str, result: dict) -> int:
+    """Counts runs and failures per skill; returns the current failure streak."""
+    data = load_health(path)
+    h = data.setdefault(name, {"runs": 0, "fails": 0, "streak": 0})
+    now = dt.datetime.now().isoformat(timespec="seconds")
+    h["runs"] += 1
+    if result["status"] == "ok":
+        h["streak"] = 0
+        h["last_ok"] = now
+    else:
+        h["fails"] += 1
+        h["streak"] += 1
+        h["last_error"] = result["message"][:200]
+        h["last_error_at"] = now
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
+    except OSError:
+        log.warning("Could not save skill health", exc_info=True)
+    return h["streak"]
+
+
+async def _run(skill: Skill, skill_args: dict) -> dict:
+    name = skill.name
     try:
         proc = await asyncio.to_thread(_execute, skill, skill_args)
     except subprocess.TimeoutExpired:
         return {"status": "error", "message": f"{name} {RUN_TIMEOUT} saniyede bitmedi."}
     lines = [line.strip() for line in proc.stdout.splitlines() if line.strip()]
     last = lines[-1] if lines else ""
-    if proc.returncode != 0 or not last or last.startswith("Hata"):
+    # In a .ps1 that ends without `exit`, $LASTEXITCODE is whatever native
+    # command ran last (e.g. a `winget list` that found nothing), so its exit
+    # code is unreliable; the "Hata:" line is what counts there.
+    exit_failed = proc.returncode != 0 and skill.entry.suffix.lower() != ".ps1"
+    if exit_failed or not last or last.startswith("Hata"):
         stderr = proc.stderr.strip().splitlines()
         detail = last or (stderr[-1] if stderr else f"çıkış kodu {proc.returncode}")
         return {"status": "error", "message": f"{name}: {detail.removeprefix('Hata: ')}"}
@@ -226,11 +286,15 @@ async def list_skills(args: dict, settings: Settings) -> dict:
     skills = load_skills(settings.skills_dir)
     if not skills:
         return {"status": "ok", "message": "Henüz öğrendiğim bir yetenek yok.", "skills": []}
+    health = load_health(settings.data_dir / HEALTH_FILE)
+    broken = [n for n in skills if health.get(n, {}).get("streak", 0) >= REPAIR_AFTER]
     return {
         "status": "ok",
         "message": "Öğrendiğim yetenekler: "
-        + "; ".join(f"{s.name}: {s.description}" for s in skills.values()),
+        + "; ".join(f"{s.name}: {s.description}" for s in skills.values())
+        + (f". Son denemelerde hep başarısız olanlar: {', '.join(broken)}." if broken else ""),
         "skills": [s.signature() for s in skills.values()],
+        "health": {n: health[n] for n in skills if n in health},
     }
 
 

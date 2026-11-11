@@ -33,7 +33,7 @@ def test_tailscale_proxy_is_not_treated_as_local(client, settings):
         "/api/tool", json={"name": "get_time"}, headers={"X-Forwarded-For": "100.64.0.7"}
     )
     assert res.status_code == 401
-    res = client.post("/api/token", headers={"Tailscale-User-Login": "batu@example.com"})
+    res = client.post("/api/token", headers={"Tailscale-User-Login": "ada@example.com"})
     assert res.status_code == 401
 
 

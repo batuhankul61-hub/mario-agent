@@ -25,6 +25,9 @@ SCOPES = [
     "https://www.googleapis.com/auth/gmail.readonly",
     "https://www.googleapis.com/auth/gmail.send",
 ]
+# Asked for by scripts/gmail_login.py along with Gmail; read-only.
+CALENDAR_SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
+LOGIN_SCOPES = SCOPES + CALENDAR_SCOPES
 BODY_LIMIT = 3000
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
@@ -36,6 +39,10 @@ class NotConnected(Exception):
     pass
 
 
+def is_connected(settings: Settings) -> bool:
+    return settings.gmail_token_file.exists()
+
+
 def _token(settings: Settings) -> str:
     from google.auth.transport.requests import Request  # noqa: PLC0415
     from google.oauth2.credentials import Credentials  # noqa: PLC0415
@@ -43,7 +50,8 @@ def _token(settings: Settings) -> str:
     path: Path = settings.gmail_token_file
     if not path.exists():
         raise NotConnected
-    creds = Credentials.from_authorized_user_file(str(path), SCOPES)
+    # No scopes passed: the refresh keeps whatever the user granted at login.
+    creds = Credentials.from_authorized_user_file(str(path))
     if not creds.valid:
         if not creds.refresh_token:
             raise NotConnected

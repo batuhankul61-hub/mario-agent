@@ -129,6 +129,38 @@ async def test_timeout(settings, monkeypatch):
     assert res["message"] == "selam 30 saniyede bitmedi."
 
 
+@pytest.mark.parametrize(
+    ("entry", "code", "out", "status"),
+    [
+        # A .ps1 that ends without `exit` keeps the last native command's code.
+        ("run.ps1", 1, "Kurulum başladı.", "ok"),
+        ("run.ps1", 1, "Hata: Bulunamadı.", "error"),
+        ("run.py", 1, "Yarım kaldı.", "error"),
+        ("run.py", 0, "Tamam.", "ok"),
+    ],
+)
+async def test_last_line_decides_for_powershell(monkeypatch, settings, entry, code, out, status):
+    write_skill(settings.skills_dir, entry=entry)
+    monkeypatch.setattr(
+        skills,
+        "_execute",
+        lambda s, a: SimpleNamespace(returncode=code, stdout=out + "\n", stderr=""),
+    )
+    res = await skills.run_skill({"name": "selam", "args_json": '{"ad": "a"}'}, settings)
+    assert res["status"] == status
+
+
+def test_skills_get_the_shared_helpers(monkeypatch, settings):
+    write_skill(settings.skills_dir)
+    seen = {}
+    monkeypatch.setattr(
+        skills.subprocess, "run", lambda *a, **k: seen.update(k) or SimpleNamespace()
+    )
+    skills._execute(skills.load_skills(settings.skills_dir)["selam"], {})
+    assert seen["env"]["MARIO_LIB"].endswith("skill_lib")
+    assert (skills.SKILL_LIB / "window.ps1").is_file()
+
+
 def test_destructive_skill_waits_for_voice_yes(client, settings):
     write_skill(settings.skills_dir, confirm="{ad} kişisine selam gönderilsin mi?")
     call = {"name": "run_skill", "args": {"name": "selam", "args_json": '{"ad": "Ahmet"}'}}

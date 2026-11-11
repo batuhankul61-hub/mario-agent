@@ -41,8 +41,24 @@ def get_context() -> Context:
         s.dry_run,
         project_dir=ROOT_DIR,
         skills_dir=s.skills_dir,
+        embedder_factory=_embedder_factory(s),
     )
     return Context(settings=s, jobs=jobs)
+
+
+def _embedder_factory(s: Settings):
+    if not s.gemini_api_key:
+        return None
+    cache: list = []
+
+    def build():
+        if not cache:
+            from .memory import GeminiEmbedder, gemini_client  # noqa: PLC0415
+
+            cache.append(GeminiEmbedder(gemini_client(s), s.embedding_model, s.embedding_dim))
+        return cache[0]
+
+    return build
 
 
 def is_local(request: Request) -> bool:

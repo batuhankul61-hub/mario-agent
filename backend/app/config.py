@@ -27,6 +27,9 @@ class Settings(BaseSettings):
 
     gemini_api_key: str = Field(default="", repr=False)
 
+    # How Mario addresses the user; empty leaves the name out of the prompt.
+    user_name: str = ""
+
     # Checked against https://aistudio.google.com/docs/live-api/tools (Nov 2026):
     # gemini-3.8-live supports both blocking and non-blocking function calls.
     live_model: str = "gemini-3.8-live"
@@ -76,6 +79,23 @@ class Settings(BaseSettings):
 
     # OAuth client of type "Desktop app" from Google Cloud Console; see README.
     gmail_client_file: Path = BACKEND_DIR / "gmail-client.json"
+
+    # Things Mario says first (app/scheduler.py): due reminders always; new
+    # primary-inbox mail and calendar events about to start when Google is
+    # connected; a low battery below this percent (0 turns it off).
+    notify_mail: bool = True
+    notify_calendar: bool = True
+    notify_battery_percent: int = 20
+    # Also show them as Windows notifications, for when Mario's page is closed.
+    toast_notifications: bool = True
+    # The background loop; tests turn it off.
+    scheduler_enabled: bool = True
+
+    # Wake-on-LAN targets for wake_device, as JSON: name -> MAC, optionally
+    # "MAC@broadcast" when the device is on another subnet's broadcast address.
+    wol_devices: dict[str, str] = {}
+    wol_broadcast: str = "255.255.255.255"
+    wol_port: int = 9
 
     # A pending destructive action must be confirmed by voice within this time.
     confirm_ttl_seconds: int = 90

@@ -16,6 +16,8 @@ const ECHO_TAIL_MS = 400;
 const TRANSCRIPT_WAIT_MS = 2500;
 const JOB_POLL_MS = 5000;
 const KICKOFF = "(Sistem notu: Kullanıcı bağlandı. Tek cümleyle selam ver.)";
+const RECONNECT_TOOL_WAIT_MS = 20_000;
+const MAX_RETRIES = 4;
 
 export class Agent extends EventTarget {
   constructor({ speakerMode = false } = {}) {
@@ -32,6 +34,11 @@ export class Agent extends EventTarget {
     // this count as the user's answer.
     this.confirmMark = 0;
     this.jobTimers = new Map();
+    this.resumeHandle = null;
+    this.reconnecting = false;
+    this.retries = 0;
+    this.inFlight = 0;
+    this.notes = [];
   }
 
   emit(type, detail) {
@@ -48,7 +55,7 @@ export class Agent extends EventTarget {
   }
 
   /** Call from a tap handler: iOS only allows audio to start inside a user gesture. */
-  async start() {
+  async start({ firstCommand = "" } = {}) {
     this.setState("connecting");
     this.audio.onChunk = (c) => this.onMic(c);
     this.audio.onPlayback = (e) => this.onPlayback(e);
@@ -62,25 +69,88 @@ export class Agent extends EventTarget {
       this.emit("notice", "Mikrofon yok ya da izin verilmedi; komutları yazarak verebilirsin.");
     }
 
-    const { token, model, max_session_minutes } = await createToken();
-    this.live = new LiveSession({ token, model });
-    this.live.addEventListener("audio", (e) => this.audio.play(e.detail));
-    this.live.addEventListener("userText", (e) => this.transcript.addUser(e.detail));
-    this.live.addEventListener("assistantText", (e) => this.transcript.addAssistant(e.detail));
-    this.live.addEventListener("interrupted", () => this.onInterrupted());
-    this.live.addEventListener("turnComplete", () => this.transcript.completeTurn(this.speakerMode));
-    this.live.addEventListener("toolCall", (e) => this.onToolCall(e.detail));
-    this.live.addEventListener("toolCancel", (e) => this.emit("notice", `İptal edilen araç çağrısı: ${e.detail.join(", ")}`));
-    this.live.addEventListener("goAway", () => this.emit("notice", "Ses oturumu birazdan zaman aşımına uğrayacak."));
-    this.live.addEventListener("error", (e) => !this.ended && this.emit("error", e.detail));
-    this.live.addEventListener("close", () => !this.ended && this.emit("dropped"));
-
-    await this.live.connect();
+    await this.connect(false);
     this.setState("listening");
-    this.live.sendText(KICKOFF);
     this.startedAt = Date.now();
-    this.limitMs = max_session_minutes * 60_000;
-    this.timer = setTimeout(() => this.emit("timeup"), this.limitMs);
+    // Opened by the wake word with a command ("Mario, saat kaç?"): do it
+    // instead of saying hello.
+    if (firstCommand) this.say(firstCommand);
+    else this.live.sendText(KICKOFF);
+  }
+
+  /** Opens a Live connection. With `resume`, it continues the conversation of
+   * the previous one through the last resumption handle. */
+  async connect(resume) {
+    const { token, model, max_session_minutes } = await createToken(resume ? this.resumeHandle : null);
+    const live = new LiveSession({ token, model });
+    // Events of a connection that was already replaced are ignored.
+    const on = (type, fn) => live.addEventListener(type, (e) => live === this.live && fn(e));
+    on("audio", (e) => this.audio.play(e.detail));
+    on("userText", (e) => this.transcript.addUser(e.detail));
+    on("assistantText", (e) => this.transcript.addAssistant(e.detail));
+    on("interrupted", () => this.onInterrupted());
+    on("turnComplete", () => this.transcript.completeTurn(this.speakerMode));
+    on("toolCall", (e) => this.onToolCall(e.detail));
+    on("toolCancel", (e) => this.emit("notice", `İptal edilen araç çağrısı: ${e.detail.join(", ")}`));
+    on("resumeHandle", (e) => (this.resumeHandle = e.detail));
+    // The server is about to close this connection: move to a new one now.
+    on("goAway", () => this.reconnect());
+    on("error", (e) => !this.ended && !this.reconnecting && this.emit("error", e.detail));
+    // Only a session that got going is resumed; a failed first connect is an error.
+    on("close", () => !this.ended && this.startedAt && this.reconnect({ dropped: true }));
+    this.live = live;
+
+    await live.connect();
+    this.retries = 0;
+    // The token stops working after max_session_minutes: switch to a fresh one
+    // a minute before, carrying the conversation over.
+    clearTimeout(this.timer);
+    const refreshMs = Math.max(60_000, (max_session_minutes - 1) * 60_000);
+    this.timer = setTimeout(() => this.reconnect(), refreshMs);
+    this.flushNotes();
+  }
+
+  /** Moves the conversation to a new connection without the user noticing. */
+  async reconnect({ dropped = false } = {}) {
+    if (this.ended || this.reconnecting) return;
+    this.reconnecting = true;
+    const hadHandle = Boolean(this.resumeHandle);
+    try {
+      // Tool results belong to the connection that asked; let them land first.
+      const deadline = Date.now() + RECONNECT_TOOL_WAIT_MS;
+      while (this.inFlight > 0 && Date.now() < deadline && !dropped) await sleep(100);
+      const old = this.live;
+      this.live = null;
+      old?.close();
+      this.setState("connecting");
+      for (;;) {
+        try {
+          await this.connect(true);
+          break;
+        } catch (err) {
+          if (this.ended) return;
+          if (++this.retries > MAX_RETRIES) throw err;
+          await sleep(1000 * 2 ** (this.retries - 1));
+        }
+      }
+      if (!hadHandle) this.emit("notice", "Bağlantı yenilendi; önceki konuşmayı hatırlamayabilirim.");
+      if (!this.ended) this.setState(this.playing ? "speaking" : "listening");
+    } catch {
+      if (!this.ended) this.emit("dropped");
+    } finally {
+      this.reconnecting = false;
+    }
+  }
+
+  /** System notes wait while the connection is being replaced. */
+  sendNote(text) {
+    if (this.live?.ready) this.live.sendText(text);
+    else this.notes.push(text);
+  }
+
+  flushNotes() {
+    const notes = this.notes.splice(0);
+    for (const n of notes) this.live.sendText(n);
   }
 
   onMic({ pcm, rms }) {
@@ -110,16 +180,24 @@ export class Agent extends EventTarget {
   /** Typed input counts as the user's words, including for confirmations. */
   say(text) {
     text = text.trim();
-    if (!text || !this.live?.ready) return;
+    if (!text || (!this.live?.ready && !this.reconnecting)) return;
     this.transcript.addUser(text);
     this.transcript.completeTurn();
-    this.live.sendText(text);
+    this.sendNote(text);
   }
 
   async onToolCall(calls) {
     this.setState("working");
-    const responses = await Promise.all(calls.map((fc) => this.runCall(fc)));
-    this.live?.sendToolResponse(responses);
+    const live = this.live;
+    this.inFlight++;
+    try {
+      const responses = await Promise.all(calls.map((fc) => this.runCall(fc)));
+      // The answer goes to the connection that asked; if that one is gone, the
+      // resumed session never waits for it.
+      if (live?.ready) live.sendToolResponse(responses);
+    } finally {
+      this.inFlight--;
+    }
   }
 
   async runCall({ id, name, args = {} }) {
@@ -156,7 +234,7 @@ export class Agent extends EventTarget {
     const result = await answerConfirmation(id, approved);
     this.transcript.addEvent({ kind: "tool", name: result.tool ?? "onay", args: {}, status: result.status, result, byButton: true });
     if (result.job_id) this.watchJob(result.job_id);
-    this.live?.sendText(
+    this.sendNote(
       `(Sistem notu: Kullanıcı ekrandaki butonla ${approved ? "onayladı" : "iptal etti"}. Sonuç: ${result.message} ` +
         `Bu iş için confirm_action ya da cancel_action çağırma.)`,
     );
@@ -171,7 +249,7 @@ export class Agent extends EventTarget {
         if (job.state !== "running") {
           this.jobTimers.delete(jobId);
           this.transcript.addEvent({ kind: "job", name: job.kind === "skill" ? "learned" : "claude", status: job.state, result: job });
-          this.live?.sendText(jobNote(job));
+          this.sendNote(jobNote(job));
           return;
         }
       } catch {}

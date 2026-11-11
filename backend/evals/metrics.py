@@ -86,8 +86,61 @@ def summarize(cases: list[Case], k: int) -> dict[str, float | int | None]:
     return summary
 
 
+# ---------- tool routing (evals/run_tool_eval.py) ----------
+
+
+def _norm(value) -> str:
+    text = str(value).replace("İ", "i").replace("I", "ı").lower()
+    return " ".join(text.split())
+
+
+def tool_call_matches(
+    expected_tool: str | list[str] | None, expected_args: dict, call: dict | None
+) -> bool:
+    """The first function call the model made against what the case expects.
+
+    expected_tool None: the model must answer without a tool; a list: any of
+    these is a right first step (e.g. listing before cancelling). Expected args are
+    a subset check; a string value matches when it appears in the actual value
+    (so "ahmet" matches "Ahmet Yılmaz"), other values must be equal."""
+    name = call.get("name") if call else None
+    if expected_tool is None:
+        return name is None
+    allowed = [expected_tool] if isinstance(expected_tool, str) else expected_tool
+    if name not in allowed:
+        return False
+    if name != allowed[0]:
+        return True  # an alternative first step; args were written for the main one
+    actual = call.get("args") or {}
+    for key, want in expected_args.items():
+        if key not in actual:
+            return False
+        got = actual[key]
+        if isinstance(want, str):
+            if _norm(want) not in _norm(got):
+                return False
+        elif got != want:
+            return False
+    return True
+
+
+def summarize_tools(results: list[dict]) -> dict[str, float | int | None]:
+    """results: {"id", "group", "ok", "error"}; accuracy overall and per group."""
+    scored = [r for r in results if not r.get("error")]
+    summary: dict[str, float | int | None] = {
+        "cases": len(results),
+        "errors": len(results) - len(scored),
+        "tool_accuracy": _mean([1.0 if r["ok"] else 0.0 for r in scored]),
+    }
+    for group in sorted({r["group"] for r in scored}):
+        summary[f"tool_accuracy_{group}"] = _mean(
+            [1.0 if r["ok"] else 0.0 for r in scored if r["group"] == group]
+        )
+    return summary
+
+
 # Counts, not rates; never compared against the baseline.
-NOT_RATES = {"questions", "errors", "dropped_citations"}
+NOT_RATES = {"questions", "errors", "dropped_citations", "cases"}
 
 
 def regressions(

@@ -5,7 +5,7 @@ description: Mario sesli asistanına yeni bir yetenek öğretir — skills/<ad>/
 
 # Mario'ya yetenek öğretme
 
-Mario, Batuhan'ın Windows bilgisayarında çalışan sesli asistanı. Hazır araçları (program açma, ekran
+Mario, kullanıcının Windows bilgisayarında çalışan sesli asistanı. Hazır araçları (program açma, ekran
 görüntüsü, ses/ekran/ağ/güç ayarları, Gmail, hava durumu, Claude'a görev...) bir isteği karşılamadığında
 Mario senden o işi **kalıcı bir yetenek** olarak öğretmeni ister. Mario yeteneği `run_skill` aracıyla
 çalıştırır; senin işin yeteneği yazmak ve güvenle denemek, kullanıcının isteğini yerine getirmek değil.
@@ -67,6 +67,14 @@ klasörlerine dokunma.
 - Kullanıcının verisini kullanıcı adına kendiliğinden göndermesi gereken arayüz işlerinde (ör. WhatsApp
   Desktop) önce resmi yolu dene: URI şemaları (`whatsapp://send?phone=...&text=...`), uygulamanın kendi
   komut satırı, açık API'ler. Tuş/fare otomasyonu son çare olsun ve odaklanmayı doğrula.
+- Bir pencereyi öne getirmen gerekiyorsa kendi `SetForegroundWindow` kodunu yazma: Windows, Mario'nun
+  sunucusundan gelen bu isteği çoğu zaman reddeder ("pencere öne getirilemedi"). Ortak yardımcıyı kullan:
+  `. (Join-Path $env:MARIO_LIB 'window.ps1')`, sonra `Set-MarioForeground -ProcessName 'WhatsApp'` (ya da
+  `-Title '...'`). `$true` dönmezse tuşa basma, `Hata:` ile çık. `MARIO_LIB`, yeteneği Mario çalıştırırken
+  tanımlıdır; kendin denerken `$env:MARIO_LIB = '<proje>\backend\skill_lib'` ver.
+- `.ps1` betiğinde başarı ya da başarısızlığı yalnızca son satır belirler: çıkış kodu, betiğin içinde en son
+  çalışan programdan (ör. bulamayan bir `winget list`) kalabilir. Bu yüzden her başarısızlıkta son satır
+  mutlaka `Hata:` ile başlasın.
 - Şifre, API anahtarı ya da kişisel veri dosyaya yazma. Anahtar gereken bir servis varsa ve bu bilgisayarda
   yoksa yeteneği yazma (bkz. 5).
 - Kullanıcının bilgisayarındaki yolları sabit yazma; `$env:APPDATA`, `[Environment]::GetFolderPath(...)`

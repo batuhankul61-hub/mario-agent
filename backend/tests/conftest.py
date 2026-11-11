@@ -1,3 +1,8 @@
+import os
+
+# No background reminders/mail checks while the app runs under TestClient.
+os.environ["SCHEDULER_ENABLED"] = "false"
+
 import pytest
 from app.config import Settings, get_settings
 from app.confirm import PendingActions
@@ -16,11 +21,13 @@ class FakeGemini:
     def __init__(self):
         self.fail = False
         self.calls = 0
+        self.resume_handle = None
 
-    async def create_live_token(self):
+    async def create_live_token(self, resume_handle=None):
         if self.fail:
             raise RuntimeError("boom")
         self.calls += 1
+        self.resume_handle = resume_handle
         return types.AuthToken(name="auth_tokens/fake-token", expire_time="2026-11-03T12:00:00Z")
 
 
@@ -49,6 +56,15 @@ def project_untouched():
     after = {p: p.stat().st_mtime_ns for d in watched if d.exists() for p in d.rglob("*")}
     changed = [str(p) for p in after if before.get(p) != after[p] and "__pycache__" not in p.parts]
     assert not changed, f"test wrote into the project: {changed}"
+
+
+@pytest.fixture(autouse=True)
+def no_program_lookups(monkeypatch):
+    """open_program's registry / Program Files / Get-StartApps fallbacks read the real PC."""
+    from app.tools import system
+
+    for name in ("app_paths", "program_files", "start_apps"):
+        monkeypatch.setattr(system, name, lambda wanted: None)
 
 
 @pytest.fixture

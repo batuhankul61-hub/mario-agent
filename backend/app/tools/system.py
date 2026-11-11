@@ -72,7 +72,81 @@ def find_program(name: str, settings: Settings) -> tuple[str | None, list[str]]:
             return None, sorted({p.stem for p in partial})[:8]
     if wanted in BUILTINS:
         return BUILTINS[wanted], []
+    # Programs installed without a Start Menu shortcut (winget, portable
+    # installs) or Store apps: slower lookups, so only after the shortcuts.
+    for lookup in (app_paths, program_files, start_apps):
+        try:
+            target = lookup(wanted)
+        except (OSError, subprocess.SubprocessError):
+            target = None
+        if target:
+            return target, []
     return None, []
+
+
+def app_paths(wanted: str) -> str | None:
+    """HKCU/HKLM ...\\App Paths\\<name>.exe, where installers register their exe."""
+    import winreg  # noqa: PLC0415  # Windows only
+
+    key = r"Software\Microsoft\Windows\CurrentVersion\App Paths"
+    for hive in (winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE):
+        try:
+            root = winreg.OpenKey(hive, key)
+        except OSError:
+            continue
+        with root:
+            for i in range(winreg.QueryInfoKey(root)[0]):
+                sub = winreg.EnumKey(root, i)
+                if plain(Path(sub).stem) != wanted:
+                    continue
+                with winreg.OpenKey(root, sub) as k:
+                    path = str(winreg.QueryValue(k, None)).strip('"')
+                if Path(path).is_file():
+                    return path
+    return None
+
+
+def program_files(wanted: str) -> str | None:
+    """<Program Files>\\<Vendor or App>\\...\\<app>.exe, two folders deep at most."""
+    roots = [os.environ.get(v, "") for v in ("ProgramFiles", "ProgramFiles(x86)", "ProgramW6432")]
+    if os.environ.get("LOCALAPPDATA"):
+        roots.append(str(Path(os.environ["LOCALAPPDATA"]) / "Programs"))
+    for root in dict.fromkeys(r for r in roots if r):
+        base = Path(root)
+        if not base.is_dir():
+            continue
+        for folder in base.iterdir():
+            if not folder.is_dir() or wanted not in plain(folder.name):
+                continue
+            for exe in [*folder.glob("*.exe"), *folder.glob("*/*.exe")]:
+                if plain(exe.stem) == wanted:
+                    return str(exe)
+    return None
+
+
+def start_apps(wanted: str) -> str | None:
+    """Get-StartApps covers Store apps too; they open through shell:AppsFolder."""
+    p = subprocess.run(
+        [
+            "powershell",
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            "[Console]::OutputEncoding = [Text.Encoding]::UTF8; "
+            'Get-StartApps | ForEach-Object { $_.Name + "`t" + $_.AppID }',
+        ],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=15,
+        creationflags=NO_WINDOW,
+    )
+    apps = [line.split("\t", 1) for line in p.stdout.splitlines() if "\t" in line]
+    exact = [aid for name, aid in apps if plain(name) == wanted]
+    partial = [aid for name, aid in apps if wanted in plain(name)]
+    hit = exact[:1] or (partial if len(partial) == 1 else [])
+    return f"shell:AppsFolder\\{hit[0].strip()}" if hit else None
 
 
 async def open_program(name: str, settings: Settings) -> dict:
@@ -84,7 +158,7 @@ async def open_program(name: str, settings: Settings) -> dict:
         }
     if not target:
         return {"status": "error", "message": f"'{name}' adında bir program bulamadım."}
-    label = Path(target).stem if os.path.sep in target else name
+    label = Path(target).stem if os.path.sep in target and not target.startswith("shell:") else name
     if settings.dry_run:
         return {"status": "ok", "message": f"(deneme) {label} açılacaktı.", "target": target}
     try:

@@ -1,0 +1,42 @@
+{"id": "t01", "group": "direct", "say": "Not defterini aç.", "tool": "open_program", "args": {"name": "not"}}
+{"id": "t02", "group": "direct", "say": "Chrome'un ekran görüntüsünü al.", "tool": "take_screenshot", "args": {"target": "chrome"}}
+{"id": "t03", "group": "direct", "say": "Ekranı kilitle.", "tool": "lock_computer", "args": {}}
+{"id": "t04", "group": "direct", "say": "Bilgisayarı yeniden başlat.", "tool": "shutdown_computer", "args": {"mode": "restart"}}
+{"id": "t05", "group": "direct", "say": "İzmir'de hava nasıl?", "tool": "get_weather", "args": {"city": "izmir"}}
+{"id": "t06", "group": "direct", "say": "Saat kaç?", "tool": "get_time", "args": {}}
+{"id": "t07", "group": "direct", "say": "Sesi otuza ayarla.", "tool": "set_volume", "args": {"level": 30}}
+{"id": "t08", "group": "direct", "say": "Sesi biraz kıs.", "tool": "set_volume", "args": {"change": "down"}}
+{"id": "t09", "group": "direct", "say": "Koyu temaya geç.", "tool": "set_theme", "args": {"mode": "dark"}}
+{"id": "t10", "group": "direct", "say": "Bluetooth'u kapat.", "tool": "set_radio", "args": {"radio": "bluetooth", "on": false}}
+{"id": "t11", "group": "direct", "say": "Gece ışığı ayarlarını aç.", "tool": "open_settings", "args": {}}
+{"id": "t12", "group": "direct", "say": "Hangi programlar açık?", "tool": "list_programs", "args": {}}
+{"id": "t13", "group": "direct", "say": "Discord'u kapat.", "tool": "close_program", "args": {"name": "discord"}}
+{"id": "t14", "group": "direct", "say": "Bilgisayarın durumu ne, pil kaç?", "tool": "get_pc_status", "args": {}}
+{"id": "t15", "group": "direct", "say": "Sesi monitöre ver.", "tool": "set_audio_output", "args": {"device": "monitör"}}
+{"id": "t16", "group": "direct", "say": "Rahatsız etme modunu aç.", "tool": "set_do_not_disturb", "args": {"on": true}}
+{"id": "t17", "group": "mail", "say": "Okunmamış maillerim var mı?", "tool": "list_emails", "args": {}}
+{"id": "t18", "group": "mail", "say": "Ahmet'in mail adresi ne?", "tool": "find_email_address", "args": {"name": "ahmet"}}
+{"id": "t19", "group": "reminder", "say": "On dakika sonra çayı hatırlat.", "tool": "set_reminder", "args": {"in_minutes": 10}}
+{"id": "t20", "group": "reminder", "say": "Beş dakikalık zamanlayıcı kur.", "tool": "set_reminder", "args": {"in_minutes": 5}}
+{"id": "t21", "group": "reminder", "say": "Hangi hatırlatmalarım var?", "tool": "list_reminders", "args": {}}
+{"id": "t22", "group": "reminder", "say": "Bugün takvimde neyim var?", "tool": "list_calendar_events", "args": {}}
+{"id": "t23", "group": "memory", "say": "Bunu hatırla: annemin doğum günü 17 Mart.", "tool": "remember", "args": {"text": "17 mart"}}
+{"id": "t24", "group": "memory", "say": "Kirayı ayın kaçında ödüyordum?", "tool": "ask_memory", "args": {"question": "kira"}}
+{"id": "t25", "group": "memory", "say": "Wi-Fi şifresini nereye yazmıştım?", "tool": "ask_memory", "args": {}}
+{"id": "t26", "group": "memory", "say": "Belgelerime yeni dosyalar ekledim, tara.", "tool": "index_documents", "args": {}}
+{"id": "t27", "group": "learn", "say": "WhatsApp'tan Mehmet'e akşam geliyorum yaz.", "tool": "learn_skill", "args": {}}
+{"id": "t28", "group": "learn", "say": "Spotify'da çalan şarkıyı beğenilenlere ekle.", "tool": "learn_skill", "args": {}}
+{"id": "t29", "group": "learn", "say": "Dolar kaç lira?", "tool": "learn_skill", "args": {}}
+{"id": "t30", "group": "claude", "say": "Claude'a sor: masaüstündeki README dosyasını İngilizceye çevirsin.", "tool": "delegate_to_claude", "args": {}}
+{"id": "t31", "group": "none", "say": "Merhaba, nasılsın?", "tool": null, "args": {}}
+{"id": "t32", "group": "none", "say": "Serendipity kelimesi ne demek?", "tool": null, "args": {}}
+{"id": "t33", "group": "none", "say": "Teşekkürler, bu kadar.", "tool": null, "args": {}}
+{"id": "t34", "group": "followup", "history": [["user", "İstanbul'da hava nasıl?"], ["model", "İstanbul'da hava parçalı bulutlu, 14 derece."]], "say": "Peki Ankara'da?", "tool": "get_weather", "args": {"city": "ankara"}}
+{"id": "t35", "group": "followup", "history": [["user", "Sesi 30 yap."], ["model", "Sesi 30'a ayarladım."]], "say": "Biraz daha aç.", "tool": "set_volume", "args": {"change": "up"}}
+{"id": "t36", "group": "followup", "history": [["user", "Chrome'u aç."], ["model", "Chrome açıldı."]], "say": "Şimdi kapat.", "tool": "close_program", "args": {"name": "chrome"}}
+{"id": "t37", "group": "followup", "history": [["user", "Ahmet'ten gelen son maili bul."], ["model", "Ahmet'ten bir e-posta var: Toplantı saati."]], "say": "Ona yarın geliyorum diye cevap yaz.", "tool": ["reply_email", "list_emails"], "args": {"body": "yarın"}}
+{"id": "t38", "group": "followup", "history": [["user", "On dakika sonra toplantıyı hatırlat."], ["model", "Toplantı hatırlatmasını bugün 15:10 için kurdum."]], "say": "Onu iptal et.", "tool": ["cancel_reminder", "list_reminders"], "args": {}}
+{"id": "t39", "group": "followup", "history": [["user", "Bluetooth'u kapat."], ["model", "Bluetooth kapatıldı."]], "say": "Tekrar aç.", "tool": "set_radio", "args": {"radio": "bluetooth", "on": true}}
+{"id": "t41", "group": "followup", "history": [["user", "Benim en sevdiğim renk turuncu."], ["model", "Tamam, not ettim."]], "say": "En sevdiğim renk neydi?", "tool": null, "args": {}}
+{"id": "t42", "group": "learn", "say": "Euro bugün kaç TL?", "tool": "learn_skill", "args": {}}
+{"id": "t40", "group": "followup", "history": [["user", "Not defterini aç."], ["model", "Not Defteri açıldı."]], "say": "Teşekkürler.", "tool": null, "args": {}}

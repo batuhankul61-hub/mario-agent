@@ -49,6 +49,8 @@ ignore = ["E501", "B008", "B904", "B905"]
 [tool.ruff.lint.per-file-ignores]
 "scripts/*" = ["E402"]
 "evals/*" = ["E402"]
+# Sets an environment variable before the app is imported.
+"tests/conftest.py" = ["E402"]
 
 [tool.ruff.format]
 quote-style = "double"

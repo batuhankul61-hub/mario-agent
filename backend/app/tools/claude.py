@@ -13,8 +13,10 @@ import re
 import secrets
 import subprocess
 import sys
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
+from typing import Any
 
 from .. import audit, experience
 from . import skills
@@ -118,8 +120,12 @@ class ClaudeJobs:
         dry_run: bool = False,
         project_dir: Path | None = None,
         skills_dir: Path | None = None,
+        embedder_factory: Callable[[], Any] | None = None,
     ):
         self.claude_path = claude_path
+        # Builds the memory's embedder on first use; lessons from past jobs are
+        # then found by meaning instead of shared words.
+        self.embedder_factory = embedder_factory
         self.workdir = workdir
         self.project_dir = project_dir or workdir
         self.skills_dir = skills_dir or workdir / "skills"
@@ -164,7 +170,13 @@ class ClaudeJobs:
         return {"status": "ok", "message": message, **asdict(job)}
 
     async def _finish(self, job: Job) -> None:
-        lessons = experience.prompt_section(self.experience_path, job.task)
+        embedder = None
+        if self.embedder_factory:
+            try:
+                embedder = self.embedder_factory()
+            except Exception:
+                embedder = None
+        lessons = await experience.prompt_section_for(self.experience_path, job.task, embedder)
         lesson = ""
         if job.kind == "skill":
             ok, text = await asyncio.to_thread(

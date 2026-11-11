@@ -23,7 +23,7 @@ MESSAGES = {
             "mimeType": "multipart/alternative",
             "headers": [
                 {"name": "From", "value": "Ahmet Yılmaz <ahmet@example.com>"},
-                {"name": "To", "value": "Batuhan <batu@example.com>"},
+                {"name": "To", "value": "Ada <ada@example.com>"},
                 {"name": "Subject", "value": "Toplantı"},
                 {"name": "Date", "value": "Tue, 3 Nov 2026 09:00:00 +0300"},
                 {"name": "Message-ID", "value": "<abc@example.com>"},

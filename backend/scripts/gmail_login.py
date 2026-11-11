@@ -14,7 +14,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.config import get_settings  # noqa: E402
-from app.tools.gmail import SCOPES  # noqa: E402
+from app.tools.gmail import LOGIN_SCOPES as SCOPES  # noqa: E402
 from google_auth_oauthlib.flow import InstalledAppFlow  # noqa: E402
 
 

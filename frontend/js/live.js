@@ -67,6 +67,10 @@ export class LiveSession extends EventTarget {
     if (msg.toolCallCancellation?.ids) this.emit("toolCancel", msg.toolCallCancellation.ids);
     if (msg.usageMetadata) this.emit("usage", msg.usageMetadata);
     if (msg.goAway) this.emit("goAway", msg.goAway.timeLeft);
+    // A handle to continue this conversation on a new connection; only valid
+    // when the server says the session is resumable at this point.
+    const upd = msg.sessionResumptionUpdate;
+    if (upd?.resumable && upd.newHandle) this.emit("resumeHandle", upd.newHandle);
   }
 
   send(obj) {
